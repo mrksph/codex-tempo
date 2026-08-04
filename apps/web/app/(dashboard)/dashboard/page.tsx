@@ -10,10 +10,10 @@ import type { Project, Run, Summary } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 
 const ACTIVITY_RANGES: Record<ActivityRange, { days: number; title: string }> = {
-  "24h": { days: 1, title: "Actividad de las últimas 24 horas" },
-  "7d": { days: 7, title: "Actividad de los últimos 7 días" },
-  "30d": { days: 30, title: "Actividad de los últimos 30 días" },
-  "90d": { days: 90, title: "Actividad de los últimos 90 días" },
+  "24h": { days: 1, title: "Activity in the last 24 hours" },
+  "7d": { days: 7, title: "Activity in the last 7 days" },
+  "30d": { days: 30, title: "Activity in the last 30 days" },
+  "90d": { days: 90, title: "Activity in the last 90 days" },
 };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string | string[] }> }) {
@@ -33,30 +33,54 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ]);
   const names = new Map(projectData.projects.map((project) => [project.id, project.name]));
   const activityProjectCount = new Set(timelineData.runs.map((run) => run.project_id)).size;
-  const chartValues = Object.entries(summaryData.project_span_seconds).map(([id, seconds]) => ({ id, name: names.get(id) || id.slice(0, 8), seconds })).sort((a,b) => b.seconds-a.seconds);
+  const chartValues = Object.entries(summaryData.project_span_seconds)
+    .map(([id, seconds]) => ({ id, name: names.get(id) || id.slice(0, 8), seconds }))
+    .sort((a, b) => b.seconds - a.seconds);
+
   return <>
-    <PageHeader title="Resumen de hoy" subtitle="Actividad consolidada en todas las sesiones" period={new Intl.DateTimeFormat("es", {day:"2-digit",month:"short",year:"numeric"}).format(new Date())}/>
-    <section className="metrics" aria-label="Métricas principales">
-      <Metric label="Tiempo de agente" value={formatDuration(summaryData.agent_seconds)} meta="Los solapamientos suman"/>
-      <Metric label="Tiempo real" value={formatDuration(summaryData.wall_clock_seconds)} meta="Unión de intervalos"/>
-      <Metric label="Máx. simultáneos" value={String(summaryData.parallelism_peak)} meta="Pico de hoy, no tiempo real"/>
-      <Metric label="Intervalos" value={String(summaryData.run_count)} meta="Tramos iniciados hoy"/>
-      <Metric label="Tokens" value={compact(summaryData.input_tokens + summaryData.output_tokens)} meta={`${compact(summaryData.output_tokens)} de salida`}/>
+    <PageHeader
+      title="Today's summary"
+      subtitle="Aggregated activity across all sessions"
+      period={new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
+    />
+    <section className="metrics" aria-label="Primary metrics">
+      <Metric label="Agent time" value={formatDuration(summaryData.agent_seconds)} meta="Overlap counts too"/>
+      <Metric label="Wall-clock time" value={formatDuration(summaryData.wall_clock_seconds)} meta="Union of intervals"/>
+      <Metric label="Peak parallelism" value={String(summaryData.parallelism_peak)} meta="Today's peak, not real time"/>
+      <Metric label="Runs" value={String(summaryData.run_count)} meta="Runs started today"/>
+      <Metric label="Tokens" value={compact(summaryData.input_tokens + summaryData.output_tokens)} meta={`${compact(summaryData.output_tokens)} output`}/>
     </section>
     <ActivityTimelinePanel
       from={timelineData.from}
       key={selectedRange}
-      meta={`${activityProjectCount} proyectos`}
-      note="Proyectos con trabajo registrado, ordenados por actividad reciente"
+      meta={`${activityProjectCount} projects`}
+      note="Projects with recorded work, ordered by recent activity"
       projects={projectData.projects}
       range={selectedRange}
       runs={timelineData.runs}
       title={activityRangeConfig.title}
       to={timelineData.to}
     />
-    <section className="panel"><AutoRefresh/><div className="panel-head"><div><h2 className="panel-title">Tiempo por proyecto</h2><p className="panel-note">Tiempo de agente acumulado hoy</p></div><span className="panel-subtitle">{chartValues.length} proyectos</span></div><ProjectChart values={chartValues}/></section>
+    <section className="panel">
+      <AutoRefresh />
+      <div className="panel-head">
+        <div>
+          <h2 className="panel-title">Time by project</h2>
+          <p className="panel-note">Accumulated agent time today</p>
+        </div>
+        <span className="panel-subtitle">{chartValues.length} projects</span>
+      </div>
+      <ProjectChart values={chartValues} />
+    </section>
   </>;
 }
 
-function formatDuration(seconds:number){const minutes=Math.round(seconds/60);if(minutes<60)return `${minutes} min`;return `${Math.floor(minutes/60)} h ${String(minutes%60).padStart(2,"0")} min`}
-function compact(value:number){return new Intl.NumberFormat("es",{notation:"compact",maximumFractionDigits:1}).format(value)}
+function formatDuration(seconds: number) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+}
+
+function compact(value: number) {
+  return new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}

@@ -113,11 +113,11 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
     onZoomChange({ start: nextStart, end: nextEnd });
   }
 
-  return <div className="activity-timeline" role="region" aria-label="Actividad por proyecto en el periodo seleccionado">
+  return <div className="activity-timeline" role="region" aria-label="Activity by project in the selected period">
       <div className="activity-labels">
         <div className="activity-axis-spacer" />
         {activity.map((project) => <div className="activity-project" key={project.id}>
-          <Link className="activity-project-name" href={`/projects/${project.id}`} title={`Ver ${project.name}`}>
+          <Link className="activity-project-name" href={`/projects/${project.id}`} title={`View ${project.name}`}>
             <span className="activity-project-swatch" style={{ backgroundColor: project.color }} />
             <span>{project.name}</span>
           </Link>
@@ -145,7 +145,7 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
               {tick.showLabel && <span className="activity-tick-label">{formatTick(tick.value)}</span>}
             </div>)}
           </div>
-          {activity.length === 0 && <div className="empty activity-empty">No hay actividad registrada en este rango.</div>}
+          {activity.length === 0 && <div className="empty activity-empty">No activity has been recorded in this range.</div>}
           {activity.map((project) => <div className="activity-plot-row" key={project.id}>
             <div className="activity-track">
               {ticks.map((tick) => <span className={`activity-gridline ${tick.major ? "major" : ""}`} key={tick.value} style={{ left: `${((tick.value - start) / span) * 100}%` }} />)}
@@ -159,7 +159,7 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
                   key={`${interval.start}-${index}`}
                   style={{ backgroundColor: project.color, left: `${left}%`, width: `${width}%` }}
                   title={`${project.name} · ${formatInterval(interval)} · ${formatDuration(interval.end - interval.start)}`}
-                  aria-label={`Ver ${project.name}: ${formatInterval(interval)}`}
+                  aria-label={`View ${project.name}: ${formatInterval(interval)}`}
                 />;
               })}
             </div>
@@ -266,7 +266,7 @@ function mergeIntervals(intervals: Interval[]) {
 }
 
 function formatTick(value: number) {
-  return new Intl.DateTimeFormat("es", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -276,7 +276,7 @@ function formatTick(value: number) {
 }
 
 function formatHoverTime(value: number) {
-  return new Intl.DateTimeFormat("es", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -286,7 +286,7 @@ function formatHoverTime(value: number) {
 }
 
 function formatInterval(interval: Interval) {
-  const format = new Intl.DateTimeFormat("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIME_ZONE });
+  const format = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIME_ZONE });
   return `${format.format(new Date(interval.start))} - ${format.format(new Date(interval.end))}`;
 }
 

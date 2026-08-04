@@ -16,9 +16,9 @@ export default async function SessionsPage() {
   const machineNames = new Map(machines.map((machine) => [machine.id, machine.name]));
 
   return <>
-    <PageHeader title="Sesiones" subtitle="Conversaciones nativas de Codex; la actividad importada de Wakapi no genera sesiones aquí"/>
+    <PageHeader title="Sessions" subtitle="Native Codex conversations; imported Wakapi activity does not create sessions here" />
     <div className="table-wrap">{sessions.length ? <table>
-      <thead><tr><th>Proyecto</th><th>Origen</th><th>Turnos</th><th>Máquina</th><th>Inicio</th><th>Última actividad</th><th>Sesión</th></tr></thead>
+      <thead><tr><th>Project</th><th>Source</th><th>Runs</th><th>Machine</th><th>Start</th><th>Last activity</th><th>Session</th></tr></thead>
       <tbody>{sessions.map((session) => <tr key={session.id}>
         <td><Link className="project-link" href={`/projects/${session.project_id}`}><strong>{projectNames.get(session.project_id) || short(session.project_id)}</strong><ArrowUpRight size={13}/></Link></td>
         <td><span className={`badge source-${session.source}`}>{sourceLabel(session.source)}</span></td>
@@ -28,7 +28,7 @@ export default async function SessionsPage() {
         <td>{date(session.last_activity_at)}</td>
         <td><span className="session-id" title={session.id}><TerminalSquare size={13}/>{short(stripPrefix(session.id))}</span></td>
       </tr>)}</tbody>
-    </table> : <div className="empty">Todavía no hay sesiones nativas registradas.</div>}</div>
+    </table> : <div className="empty">No native sessions have been recorded yet.</div>}</div>
   </>;
 }
 
@@ -42,9 +42,9 @@ function short(value: string) {
 }
 
 function date(value: string) {
-  return new Intl.DateTimeFormat("es", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
 }
 
 function sourceLabel(value: string) {
-  return value === "hook" ? "Hooks" : value === "codex" ? "Histórico Codex" : value;
+  return value === "hook" ? "Hooks" : value === "codex" ? "Codex history" : value;
 }

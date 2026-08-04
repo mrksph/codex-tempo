@@ -15,9 +15,9 @@ export default async function ProjectsPage() {
   ]);
 
   return <>
-    <PageHeader title="Proyectos" subtitle="Actividad reciente e histórica por repositorio"/>
+    <PageHeader title="Projects" subtitle="Recent and historical activity by repository" />
     <div className="table-wrap">{projects.length ? <table>
-      <thead><tr><th>Proyecto</th><th>Últimos 30 días</th><th>Total registrado</th><th>Intervalos</th><th>Última actividad</th></tr></thead>
+      <thead><tr><th>Project</th><th>Last 30 days</th><th>Total tracked</th><th>Runs</th><th>Last activity</th></tr></thead>
       <tbody>{projects.map((project) => <tr key={project.id}>
         <td><Link className="project-link" href={`/projects/${project.id}`}><FolderKanban size={15}/><strong>{project.name}</strong><ArrowUpRight size={13}/></Link></td>
         <td className="numeric"><strong>{recentDuration(summary.project_span_seconds[project.id] || 0)}</strong></td>
@@ -25,7 +25,7 @@ export default async function ProjectsPage() {
         <td className="numeric">{project.run_count}</td>
         <td>{project.last_active_at ? date(project.last_active_at) : "-"}</td>
       </tr>)}</tbody>
-    </table> : <div className="empty">Todavía no hay proyectos registrados.</div>}</div>
+    </table> : <div className="empty">No projects have been recorded yet.</div>}</div>
   </>;
 }
 
@@ -39,5 +39,5 @@ function recentDuration(seconds: number) {
 }
 
 function date(value: string) {
-  return new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
 }

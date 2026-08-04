@@ -22,7 +22,7 @@ export function ActivityRangeSelect({
   rangeParam = "range",
   fromParam = "from",
   toParam = "to",
-  ariaLabel = "Rango de actividad",
+  ariaLabel = "Activity range",
 }: {
   value: ActivityRangeSelection;
   allowCustom?: boolean;
@@ -58,11 +58,11 @@ export function ActivityRangeSelect({
     onChange={(event) => changeRange(event.target.value as ActivityRangeSelection)}
     value={value}
   >
-    <option value="24h">24 horas</option>
-    <option value="7d">7 días</option>
-    <option value="30d">30 días</option>
-    <option value="90d">90 días</option>
-    {allowCustom && <option value="custom">Personalizado</option>}
+    <option value="24h">24 hours</option>
+    <option value="7d">7 days</option>
+    <option value="30d">30 days</option>
+    <option value="90d">90 days</option>
+    {allowCustom && <option value="custom">Custom</option>}
   </select>;
 }
 
@@ -98,7 +98,7 @@ export function CustomActivityRange({
 
   return <form className={`activity-custom-range${className ? ` ${className}` : ""}`} onSubmit={applyRange}>
     <label className="activity-date-field">
-      <span>Fecha de inicio</span>
+      <span>Start date</span>
       <input
         className="activity-date-input"
         max={endDate || today}
@@ -109,7 +109,7 @@ export function CustomActivityRange({
       />
     </label>
     <label className="activity-date-field">
-      <span>Fecha de fin</span>
+      <span>End date</span>
       <input
         className="activity-date-input"
         max={today}
@@ -122,7 +122,7 @@ export function CustomActivityRange({
     </label>
     <button className="activity-apply-range" disabled={pending || !startDate || !endDate || startDate > endDate} type="submit">
       <ListFilter size={14} aria-hidden="true" />
-      <span>Aplicar</span>
+      <span>Apply</span>
     </button>
   </form>;
 }

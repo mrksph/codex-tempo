@@ -61,8 +61,8 @@ export function ProjectChart({ values }: { values: { id: string; name: string; s
   }, [values]);
 
   return <div className="chart-shell">
-    <div ref={ref} className="chart" role="img" aria-label="Tiempo de agente por proyecto" />
-    {!values.length && <div className="empty chart-empty">Aún no hay actividad en este periodo.</div>}
+    <div ref={ref} className="chart" role="img" aria-label="Agent time by project" />
+    {!values.length && <div className="empty chart-empty">No activity has been recorded in this period yet.</div>}
   </div>;
 }
 

@@ -15,10 +15,10 @@ import type { Project, Run, Summary } from "@/lib/api/types";
 export const dynamic = "force-dynamic";
 
 const PROJECT_RANGES: Record<Exclude<ActivityRangeSelection, "custom">, { days: number; activityTitle: string; label: string }> = {
-  "24h": { days: 1, activityTitle: "Actividad de las últimas 24 horas", label: "Últimas 24 horas" },
-  "7d": { days: 7, activityTitle: "Actividad de los últimos 7 días", label: "Últimos 7 días" },
-  "30d": { days: 30, activityTitle: "Actividad de los últimos 30 días", label: "Últimos 30 días" },
-  "90d": { days: 90, activityTitle: "Actividad de los últimos 90 días", label: "Últimos 90 días" },
+  "24h": { days: 1, activityTitle: "Activity in the last 24 hours", label: "Last 24 hours" },
+  "7d": { days: 7, activityTitle: "Activity in the last 7 days", label: "Last 7 days" },
+  "30d": { days: 30, activityTitle: "Activity in the last 30 days", label: "Last 30 days" },
+  "90d": { days: 90, activityTitle: "Activity in the last 90 days", label: "Last 90 days" },
 };
 
 export default async function ProjectDetailPage({
@@ -62,17 +62,17 @@ export default async function ProjectDetailPage({
       : `${statsRange.displayFrom} - ${statsRange.displayTo}`
     : PROJECT_RANGES[selectedStatsRange].label;
   const timelineTitle = selectedRange === "custom"
-    ? `Actividad del ${timelineRange.displayFrom} al ${timelineRange.displayTo}`
+    ? `Activity from ${timelineRange.displayFrom} to ${timelineRange.displayTo}`
     : PROJECT_RANGES[selectedRange].activityTitle;
 
   return <>
-    <Link className="back-link" href="/projects"><ChevronLeft size={15}/>Proyectos</Link>
+    <Link className="back-link" href="/projects"><ChevronLeft size={15}/>Projects</Link>
     <PageHeader
       title={project.name}
-      subtitle="Detalle de actividad del proyecto"
+      subtitle="Project activity details"
       periodControl={<ActivityRangeSelect
         allowCustom
-        ariaLabel="Rango de métricas"
+        ariaLabel="Metric range"
         customFrom={statsRange.inputFrom}
         customTo={statsRange.inputTo}
         defaultValue="30d"
@@ -91,12 +91,12 @@ export default async function ProjectDetailPage({
       to={statsRange.inputTo}
       toParam="statsTo"
     />}
-    <section className="metrics" aria-label="Métricas del proyecto">
-      <Metric label="Total histórico" value={formatDuration(project.agent_seconds)} meta={`${project.run_count} intervalos registrados`}/>
-      <Metric label="Tiempo de agente" value={formatDuration(summary.agent_seconds)} meta={statsPeriodLabel}/>
-      <Metric label="Tiempo real" value={formatDuration(summary.wall_clock_seconds)} meta="Sin solapamientos"/>
-      <Metric label="Intervalos" value={String(summary.run_count)} meta={statsPeriodLabel}/>
-      <Metric label="Tokens" value={compact(tokens)} meta={`${compact(summary.output_tokens)} de salida`}/>
+    <section className="metrics" aria-label="Project metrics">
+      <Metric label="Lifetime total" value={formatDuration(project.agent_seconds)} meta={`${project.run_count} runs recorded`}/>
+      <Metric label="Agent time" value={formatDuration(summary.agent_seconds)} meta={statsPeriodLabel}/>
+      <Metric label="Wall-clock time" value={formatDuration(summary.wall_clock_seconds)} meta="No overlap"/>
+      <Metric label="Runs" value={String(summary.run_count)} meta={statsPeriodLabel}/>
+      <Metric label="Tokens" value={compact(tokens)} meta={`${compact(summary.output_tokens)} output`}/>
     </section>
     <ActivityTimelinePanel
       allowCustomRange
@@ -105,8 +105,8 @@ export default async function ProjectDetailPage({
       defaultRange="7d"
       from={timeline.from}
       key={`${selectedRange}-${timelineRange.inputFrom}-${timelineRange.inputTo}`}
-      meta={`${timeline.runs.length} intervalos`}
-      note={`Intervalos registrados para ${project.name}`}
+      meta={`${timeline.runs.length} runs`}
+      note={`Recorded runs for ${project.name}`}
       projects={[project]}
       range={selectedRange}
       runs={timeline.runs}
@@ -114,9 +114,9 @@ export default async function ProjectDetailPage({
       to={timeline.to}
     />
     <section className="panel">
-      <div className="panel-head"><h2 className="panel-title">Actividad reciente</h2><span className="panel-subtitle">Últimos 20 intervalos</span></div>
+      <div className="panel-head"><h2 className="panel-title">Recent activity</h2><span className="panel-subtitle">Last 20 runs</span></div>
       {recentRuns.length ? <div className="table-scroll"><table>
-        <thead><tr><th>Inicio</th><th>Duración</th><th>Origen</th><th>Modelo</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Start</th><th>Duration</th><th>Source</th><th>Model</th><th>Status</th></tr></thead>
         <tbody>{recentRuns.map((run) => <tr key={run.id}>
           <td>{formatDate(run.started_at)}</td>
           <td className="numeric">{formatRunDuration(run)}</td>
@@ -124,7 +124,7 @@ export default async function ProjectDetailPage({
           <td>{run.model || "-"}</td>
           <td><span className="badge">{statusLabel(run.status)}</span></td>
         </tr>)}</tbody>
-      </table></div> : <div className="empty activity-empty">No hay actividad reciente para este proyecto.</div>}
+      </table></div> : <div className="empty activity-empty">No recent activity has been recorded for this project.</div>}
     </section>
   </>;
 }
@@ -174,7 +174,7 @@ function resolveDateRange(selection: ActivityRangeSelection, fromValue: string |
 }
 
 function formatRangeDate(date: Date) {
-  return new Intl.DateTimeFormat("es", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
 function firstValue(value?: string | string[]) {
@@ -215,11 +215,11 @@ function formatRunDuration(run: Run) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
 }
 
 function compact(value: number) {
-  return new Intl.NumberFormat("es", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+  return new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 function source(sessionID: string) {
@@ -232,6 +232,6 @@ function sourceLabel(sessionID: string) {
 }
 
 function statusLabel(value: string) {
-  const labels: Record<string, string> = { completed: "Completado", abandoned: "Cerrado por inactividad", superseded: "Sustituido", running: "En curso" };
+  const labels: Record<string, string> = { completed: "Completed", abandoned: "Closed for inactivity", superseded: "Superseded", running: "Running" };
   return labels[value] || value;
 }
