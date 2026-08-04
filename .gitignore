@@ -1,15 +1,93 @@
-.env*
+# Environment and secrets
+.env
+.env.*
 !.env.example
+
+# Local databases and dumps
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3
 *.dump
-*.tsbuildinfo
+
+# Go binaries and build artifacts
+/bin/
+/dist/
+/output/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go test, coverage and profiling output
+/coverage/
+coverage.out
+coverage*.out
+*.coverprofile
+*.prof
+*.pprof
+cpu.out
+mem.out
+
+# Go temporary workspace files
+go.work
+go.work.sum
+
+# Node.js dependencies and caches
 node_modules/
+.pnpm-store/
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+*.tsbuildinfo
+.eslintcache
+
+# Next.js
 .next/
-dist/
-coverage/
-bin/
-output/
+out/
+.vercel/
+
+# Test and browser automation output
+.playwright/
 .playwright-cli/
+playwright-report/
+test-results/
+blob-report/
+
+# Package manager logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# GoLand and JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.fleet/
+
+# Visual Studio Code local settings
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# Temporary and editor files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/
+
+# Operating system files
 .DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
