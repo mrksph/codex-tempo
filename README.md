@@ -3,18 +3,43 @@
 [![CI](https://github.com/mrksph/codex-tempo/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mrksph/codex-tempo/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Codex Tempo is self-hosted time tracking for parallel Codex sessions. It records agent time, project span, wall-clock time, token usage, and concurrency without flattening independent sessions into a single heartbeat stream.
+Codex Tempo is self-hosted time tracking for parallel Codex sessions.
+
+It records agent time, project span, wall-clock time, token usage, and concurrency without flattening independent sessions into a single activity stream.
 
 ## Why It Exists
 
-Traditional activity trackers assume one linear stream of work. Codex Tempo is built for the opposite case: multiple agent sessions, multiple worktrees, and overlapping intervals on the same machine or across several machines.
+Traditional activity trackers assume that work happens in one linear stream.
 
-It answers questions like:
+Codex workflows often involve:
 
-- How much agent time did each project consume?
-- What was the real wall-clock span after removing overlap?
-- Which sessions were active at the same time?
-- How much did the agent actually do, versus how long the calendar stayed busy?
+* Multiple agent sessions running at the same time
+* Separate worktrees for independent tasks
+* Overlapping activity across projects
+* Sessions running on more than one machine
+
+Flattening that activity into a single heartbeat stream loses attribution and can produce misleading totals.
+
+Codex Tempo answers questions such as:
+
+* How much agent time did each project consume?
+* What was the real wall-clock duration after removing overlap?
+* Which sessions were active at the same time?
+* What was the peak level of parallelism?
+* How much agent activity occurred compared with the total calendar span?
+* How many tokens did each session or project use?
+
+## Time Model
+
+Codex Tempo keeps several related metrics separate:
+
+* **Agent time** is the accumulated active time across independent sessions.
+* **Wall-clock time** counts overlapping intervals only once.
+* **Project span** represents the calendar span covered by a project's recorded activity.
+* **Concurrency** is the number of sessions active during the same interval.
+* **Peak parallelism** is the highest observed concurrency.
+
+This distinction matters whenever sessions overlap.
 
 ## Example
 
@@ -24,66 +49,138 @@ Two sessions can overlap without losing attribution:
 Project A: 10:00-10:20
 Project B: 10:05-10:25
 
-Agent time      40 min
-Wall-clock time  25 min
-Peak parallelism 2
+Agent time        40 min
+Wall-clock time   25 min
+Peak parallelism   2
 ```
+
+The sessions account for 40 minutes of agent time, while only 25 minutes pass on the clock.
 
 ## What It Includes
 
-- A Go agent with incremental Codex JSONL parsing and a local SQLite queue.
-- A Go API with PostgreSQL, idempotent ingestion, and deterministic projection.
-- A Next.js dashboard with project charts, timelines, filtering, and live polling.
-- Hook diagnostics with daily rotation and 14-day retention.
-- Worktree-aware project resolution for repositories with linked worktrees.
+* A Go agent with incremental Codex JSONL parsing and a local SQLite queue
+* A Go API with PostgreSQL, idempotent ingestion, and deterministic projection
+* A Next.js dashboard with project charts, timelines, filtering, and live polling
+* Token usage and concurrency tracking
+* Hook diagnostics with daily rotation and 14-day retention
+* Worktree-aware project resolution for repositories with linked worktrees
+* Offline reports and diagnostics against the local database
 
 ## Architecture
 
-The system is split into three layers:
+```mermaid
+flowchart LR
+    subgraph Local["Local machine"]
+        C["Codex sessions"]
+        H["Codex hooks"]
+        A["codex-tempo-agent"]
+        Q[("SQLite queue")]
+        CLI["codex-tempo CLI"]
 
-- `codex-tempo-agent` runs locally, captures Codex activity, and syncs batches later.
-- `codex-tempo-server` accepts immutable events and rebuilds projections from them.
-- `codex-tempo` provides offline reports and diagnostics against the local database.
+        C --> H
+        H --> A
+        A --> Q
+        Q --> CLI
+    end
 
-The dashboard is a BFF-style frontend. Time calculations stay in Go, not in the browser.
+    subgraph Hosted["Self-hosted stack"]
+        S["codex-tempo-server"]
+        P[("PostgreSQL<br/>events and projections")]
+        D["Next.js dashboard"]
+
+        S --> P
+        D --> S
+    end
+
+    Q -->|"Batched synchronization"| S
+```
+
+The system is split into three main layers.
+
+### `codex-tempo-agent`
+
+The agent runs locally on each machine.
+
+It:
+
+* Captures Codex activity
+* Parses Codex JSONL incrementally
+* Resolves projects and linked worktrees
+* Stores pending data in a local SQLite queue
+* Synchronizes event batches with the server
+* Imports existing sessions during setup
+
+The local queue allows batches to be synchronized later rather than requiring every event to reach the server immediately.
+
+### `codex-tempo-server`
+
+The server accepts immutable events and rebuilds projections from them.
+
+It provides:
+
+* Idempotent event ingestion
+* PostgreSQL persistence
+* Deterministic projection rebuilding
+* Data consumed by the dashboard
+
+Time calculations remain in Go rather than being reimplemented in the browser.
+
+### `codex-tempo`
+
+The local CLI provides reports and diagnostics against the SQLite database.
+
+It can be used independently of the dashboard for local inspection and troubleshooting.
+
+The dashboard uses a backend-for-frontend architecture over the Go services.
 
 ## Requirements
 
-For self-hosted deployment:
+### Self-Hosted Deployment
 
-- Docker Engine with Compose
-- A recent browser for the dashboard
-- One or more machines with Codex hooks or the local agent installed
+* Docker Engine with Docker Compose
+* A recent browser for the dashboard
+* One or more machines with Codex hooks or the local agent installed
 
-For local builds from source:
+### Local Builds
 
-- Go 1.24 or newer
-- Node.js 24 or newer
-- pnpm 9 or newer
+* Go 1.24 or newer
+* Node.js 24 or newer
+* pnpm 9 or newer
 
 ## Quick Start
 
-1. Copy the example environment file and fill the secrets.
+### 1. Create the environment file
+
+Copy the example environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Start the full stack.
+Open `.env` and configure the deployment values and secrets.
+
+### 2. Start the stack
 
 ```bash
-docker compose --env-file .env -f deploy/compose/docker-compose.yml up --build
+docker compose \
+  --env-file .env \
+  -f deploy/compose/docker-compose.yml \
+  up --build
 ```
 
-3. Open the dashboard.
+### 3. Open the dashboard
 
 ```text
 http://localhost:3100
 ```
 
-4. Sign in with `WEB_PASSWORD`.
+Sign in using the value configured in `WEB_PASSWORD`.
 
-5. In the dashboard settings page, create or copy the agent setup key and configure each machine.
+### 4. Configure a machine
+
+Open the dashboard settings page and create or copy the agent setup key.
+
+Run:
 
 ```bash
 codex-tempo-agent configure \
@@ -91,9 +188,18 @@ codex-tempo-agent configure \
   --api-key "$AGENT_SETUP_KEY"
 ```
 
-The setup command registers the machine, stores its dedicated token locally, imports existing sessions, and performs the first sync. The setup key itself is not kept.
+The setup command:
 
-## Local Agent
+1. Registers the machine
+2. Stores its dedicated token locally
+3. Imports existing sessions
+4. Performs the first synchronization
+
+The setup key itself is not retained.
+
+Repeat the process for each machine that should report activity.
+
+## Local Agent and CLI
 
 Build the local tools from source:
 
@@ -102,82 +208,133 @@ go build -o bin/codex-tempo-agent ./apps/agent
 go build -o bin/codex-tempo ./apps/cli
 ```
 
-Useful commands:
+Run one agent collection and synchronization cycle:
 
 ```bash
 bin/codex-tempo-agent --once
+```
+
+Generate a report for the current day:
+
+```bash
 bin/codex-tempo report today
+```
+
+Run local diagnostics:
+
+```bash
 bin/codex-tempo doctor
 ```
 
-The default local config lives at `~/.config/codex-tempo/config.toml`. The default database lives at `~/.local/share/codex-tempo/tempo.db`.
+Default local paths:
+
+```text
+Configuration: ~/.config/codex-tempo/config.toml
+Database:      ~/.local/share/codex-tempo/tempo.db
+```
 
 ## Configuration
 
-The example configuration is in [`deploy/examples/config.toml`](./deploy/examples/config.toml).
+The example agent configuration is available at:
 
-Relevant runtime values include:
+[`deploy/examples/config.toml`](./deploy/examples/config.toml)
 
-- `hook_sync_interval`
-- `hook_activity_timeout`
-- `log_retention`
+Relevant runtime settings include:
 
-The production Compose stack also expects secrets such as:
+| Setting                 | Purpose                                             |
+| ----------------------- | --------------------------------------------------- |
+| `hook_sync_interval`    | Controls the synchronization interval.              |
+| `hook_activity_timeout` | Controls when hook activity is considered inactive. |
+| `log_retention`         | Controls diagnostic log retention.                  |
+| `privacy.store_paths`   | Enables path storage when explicitly configured.    |
 
-- `POSTGRES_PASSWORD`
-- `AGENT_SETUP_KEY`
-- `INTERNAL_API_TOKEN`
-- `WEB_PASSWORD`
-- `AUTH_SECRET`
-- `PUBLIC_API_URL`
-- `TZ`
-- `WEB_PORT`
-- `API_PORT`
+The production Compose stack uses values including:
+
+| Variable             | Purpose                             |
+| -------------------- | ----------------------------------- |
+| `POSTGRES_PASSWORD`  | PostgreSQL password                 |
+| `AGENT_SETUP_KEY`    | Initial machine registration key    |
+| `INTERNAL_API_TOKEN` | Internal API authentication         |
+| `WEB_PASSWORD`       | Dashboard sign-in password          |
+| `AUTH_SECRET`        | Web authentication secret           |
+| `PUBLIC_API_URL`     | API URL used by the web application |
+| `TZ`                 | Deployment timezone                 |
+| `WEB_PORT`           | Dashboard port                      |
+| `API_PORT`           | API port                            |
+
+Use [`.env.example`](./.env.example) as the source of truth for the complete configuration and any defaults.
 
 ## Privacy
 
-- Prompts, responses, reasoning, tool output, and file content are not stored by default.
-- Worktree names and linked-worktree metadata are stored.
-- Paths are optional and only stored when `privacy.store_paths` is enabled.
-- Hook logs stay local and are written with restrictive permissions.
+Codex Tempo collects operational metadata rather than session content by default.
 
-More detail lives in [`docs/privacy.md`](./docs/privacy.md).
+* Prompts are not stored.
+* Responses are not stored.
+* Reasoning is not stored.
+* Tool output is not stored.
+* File content is not stored.
+* Worktree names and linked-worktree metadata are stored.
+* Paths are stored only when `privacy.store_paths` is enabled.
+* Hook logs remain local.
+* Hook logs are written with restrictive permissions.
+
+See [`docs/privacy.md`](./docs/privacy.md) for additional details.
 
 ## Verification
 
-Current Go statement coverage: `38.3%`.
-
 The CI workflow runs:
 
-- `go vet ./...`
-- `go test -race ./...`
-- `go build ./apps/agent ./apps/cli ./apps/server`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm build`
+```bash
+go vet ./...
+go test -race ./...
+go build ./apps/agent ./apps/cli ./apps/server
+pnpm lint
+pnpm typecheck
+pnpm build
+```
 
-The repository also keeps focused unit tests around the parser, resolver, local database, sync, and hook logging paths.
+The repository keeps focused unit tests around:
+
+* Incremental JSONL parsing
+* Project and worktree resolution
+* Local SQLite storage
+* Synchronization
+* Hook logging
+* Diagnostic paths
+
+Coverage should be reported by CI or a generated badge rather than maintained as a fixed number in this README.
 
 ## Documentation
 
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- [`docs/architecture.md`](./docs/architecture.md)
-- [`docs/deployment-dokploy.md`](./docs/deployment-dokploy.md)
-- [`docs/event-model.md`](./docs/event-model.md)
-- [`docs/privacy.md`](./docs/privacy.md)
+* [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+* [`docs/architecture.md`](./docs/architecture.md)
+* [`docs/deployment-dokploy.md`](./docs/deployment-dokploy.md)
+* [`docs/event-model.md`](./docs/event-model.md)
+* [`docs/privacy.md`](./docs/privacy.md)
 
 ## Contributing
 
-Contributions are welcome, including bug reports, documentation improvements, feature suggestions, and code changes.
+Contributions are welcome, including:
 
-Before working on a significant change, please open an issue to discuss the proposal. That helps avoid duplicated work and keeps the change in scope.
+* Bug reports
+* Documentation improvements
+* Feature suggestions
+* Code changes
+* Test coverage improvements
+
+Before working on a significant change, open an issue to discuss the proposal. This helps avoid duplicated work and keeps the change within the project's scope.
 
 For a code contribution:
 
 1. Fork the repository.
-2. Create a branch for your change.
-3. Keep the change focused and avoid unrelated refactoring.
-4. Format and check the code:
+
+2. Create a branch for the change.
+
+3. Keep the change focused.
+
+4. Avoid unrelated refactoring.
+
+5. Format and verify the code:
 
    ```bash
    go fmt ./...
@@ -185,15 +342,28 @@ For a code contribution:
    go test ./...
    ```
 
-5. Open a pull request that explains what the change does, why it is needed, and how it was tested.
+6. Open a pull request explaining:
 
-Small pull requests are easier to review and merge.
+   * What the change does
+   * Why it is needed
+   * How it was tested
+
+Small, focused pull requests are easier to review and merge.
 
 ## Feedback
 
-Use GitHub Issues for bug reports, documentation gaps, and feature requests. Include the relevant command, environment, logs, and reproduction steps when possible. If the project later enables Discussions, use them for broader design questions.
+Use GitHub Issues for:
+
+* Bug reports
+* Documentation gaps
+* Feature requests
+* Reproducible operational problems
+
+Include the relevant command, environment, logs, and reproduction steps when possible.
+
+If GitHub Discussions are enabled later, use them for broader design questions.
 
 ## Notes
 
-- The public default branch is `master`.
-- The project is intended to be self-hosted first.
+* The project is intended to be self-hosted first.
+* The public default branch is `master`.
