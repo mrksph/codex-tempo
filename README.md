@@ -32,7 +32,7 @@ docker compose --env-file .env -f deploy/compose/docker-compose.yml up --build
 
 Open `http://localhost:3100` and sign in with `WEB_PASSWORD`. Set `WEB_PORT` to publish another host port.
 
-Configure an agent machine with the setup key shown in Dashboard → Ajustes:
+Configure an agent machine with the setup key shown in the Dashboard settings page:
 
 ```bash
 codex-tempo-agent configure \

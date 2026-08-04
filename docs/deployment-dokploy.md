@@ -24,10 +24,10 @@ The PostgreSQL data directory is stored in the persistent
 ## Delivery flow
 
 1. Every push and pull request runs `.github/workflows/ci.yml`.
-2. A successful `CI` run on `main` starts `.github/workflows/deploy.yml`.
+2. A successful `CI` run on `master` starts `.github/workflows/deploy.yml`.
 3. The deploy workflow calls the Dokploy API through its CLI.
-4. Dokploy checks out `main`, builds the Compose services and performs the
-   deployment on Atlas.
+4. Dokploy checks out `master`, builds the Compose services and performs the
+  deployment on Atlas.
 
 The GitHub repository stores only the Dokploy endpoint and resource identifier
 as Actions secrets. Runtime application secrets remain in Dokploy.
