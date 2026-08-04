@@ -63,6 +63,9 @@ type Session struct {
 	MachineID      string     `json:"machine_id"`
 	ProjectID      string     `json:"project_id"`
 	CWD            string     `json:"cwd,omitempty"`
+	WorktreeName   string     `json:"worktree_name,omitempty"`
+	WorktreePath   string     `json:"worktree_path,omitempty"`
+	IsWorktree     bool       `json:"is_worktree"`
 	Source         string     `json:"source"`
 	CodexVersion   string     `json:"codex_version,omitempty"`
 	StartedAt      time.Time  `json:"started_at"`

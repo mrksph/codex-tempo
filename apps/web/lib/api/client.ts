@@ -29,3 +29,10 @@ export function recentRange(days: number) {
   const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
   return { from: from.toISOString(), to: to.toISOString() };
 }
+
+export function calendarRecentRange(days: number) {
+  const to = new Date();
+  const from = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  from.setDate(from.getDate() - Math.max(0, days - 1));
+  return { from: from.toISOString(), to: to.toISOString() };
+}

@@ -146,7 +146,9 @@ func (s *Store) RebuildSession(ctx context.Context, machineID, sessionID string)
 		return nil
 	}
 	runs := projector.Project(events)
-	projectID, projectName, fingerprint, remoteHash, codexVersion := projectFromEvents(events)
+	metadata := projectFromEvents(events)
+	projectID, projectName := metadata.ProjectID, metadata.ProjectName
+	fingerprint, remoteHash, codexVersion := metadata.ProjectFingerprint, metadata.RemoteHash, metadata.CodexVersion
 	if projectID == "" && len(runs) > 0 {
 		projectID = runs[0].ProjectID
 	}
@@ -186,7 +188,7 @@ func (s *Store) RebuildSession(ctx context.Context, machineID, sessionID string)
 			break
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO sessions(id,machine_id,project_id,source,codex_version,started_at) VALUES($1,$2,$3,$4,NULLIF($5,''),$6) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id,source=excluded.source,codex_version=COALESCE(excluded.codex_version,sessions.codex_version)`, sessionID, machineID, projectID, sessionSource, codexVersion, events[0].OccurredAt); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO sessions(id,machine_id,project_id,cwd,worktree_name,worktree_path,is_worktree,source,codex_version,started_at) VALUES($1,$2,$3,NULLIF($4,''),NULLIF($5,''),NULLIF($6,''),$7,$8,NULLIF($9,''),$10) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id,cwd=COALESCE(excluded.cwd,sessions.cwd),worktree_name=COALESCE(excluded.worktree_name,sessions.worktree_name),worktree_path=COALESCE(excluded.worktree_path,sessions.worktree_path),is_worktree=excluded.is_worktree,source=excluded.source,codex_version=COALESCE(excluded.codex_version,sessions.codex_version)`, sessionID, machineID, projectID, metadata.WorktreePath, metadata.WorktreeName, metadata.WorktreePath, metadata.IsWorktree, sessionSource, codexVersion, events[0].OccurredAt); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, "DELETE FROM runs WHERE session_id=$1", sessionID); err != nil {
@@ -202,21 +204,26 @@ func (s *Store) RebuildSession(ctx context.Context, machineID, sessionID string)
 	return tx.Commit(ctx)
 }
 
-func projectFromEvents(events []domain.Event) (string, string, string, string, string) {
+type projectMetadata struct {
+	ProjectID          string `json:"project_id"`
+	ProjectName        string `json:"project_name"`
+	ProjectFingerprint string `json:"project_fingerprint"`
+	RemoteHash         string `json:"remote_hash"`
+	WorktreeName       string `json:"worktree_name"`
+	WorktreePath       string `json:"worktree_path"`
+	IsWorktree         bool   `json:"is_worktree"`
+	CodexVersion       string `json:"codex_version"`
+}
+
+func projectFromEvents(events []domain.Event) projectMetadata {
 	for _, event := range events {
-		var payload struct {
-			ProjectID          string `json:"project_id"`
-			ProjectName        string `json:"project_name"`
-			ProjectFingerprint string `json:"project_fingerprint"`
-			RemoteHash         string `json:"remote_hash"`
-			CodexVersion       string `json:"codex_version"`
-		}
+		var payload projectMetadata
 		_ = json.Unmarshal(event.Payload, &payload)
 		if payload.ProjectID != "" {
-			return payload.ProjectID, payload.ProjectName, payload.ProjectFingerprint, payload.RemoteHash, payload.CodexVersion
+			return payload
 		}
 	}
-	return "", "", "", "", ""
+	return projectMetadata{}
 }
 
 func (s *Store) sessionEvents(ctx context.Context, sessionID string) ([]domain.Event, error) {
@@ -292,7 +299,7 @@ func (s *Store) Projects(ctx context.Context) ([]ProjectSummary, error) {
 }
 
 func (s *Store) Sessions(ctx context.Context) ([]domain.Session, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT s.id,s.machine_id::text,s.project_id::text,COALESCE(s.cwd,''),s.source,COALESCE(s.codex_version,''),s.started_at,s.ended_at,COALESCE(max(COALESCE(r.ended_at,r.last_activity_at)),s.ended_at,s.started_at),count(r.id) FROM sessions s LEFT JOIN runs r ON r.session_id=s.id WHERE s.source<>'wakapi' GROUP BY s.id ORDER BY COALESCE(max(COALESCE(r.ended_at,r.last_activity_at)),s.ended_at,s.started_at) DESC LIMIT 200`)
+	rows, err := s.Pool.Query(ctx, `SELECT s.id,s.machine_id::text,s.project_id::text,COALESCE(s.cwd,''),COALESCE(s.worktree_name,''),COALESCE(s.worktree_path,''),s.is_worktree,s.source,COALESCE(s.codex_version,''),s.started_at,s.ended_at,COALESCE(max(COALESCE(r.ended_at,r.last_activity_at)),s.ended_at,s.started_at),count(r.id) FROM sessions s LEFT JOIN runs r ON r.session_id=s.id WHERE s.source<>'wakapi' GROUP BY s.id ORDER BY COALESCE(max(COALESCE(r.ended_at,r.last_activity_at)),s.ended_at,s.started_at) DESC LIMIT 200`)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +307,7 @@ func (s *Store) Sessions(ctx context.Context) ([]domain.Session, error) {
 	result := make([]domain.Session, 0)
 	for rows.Next() {
 		var v domain.Session
-		if err = rows.Scan(&v.ID, &v.MachineID, &v.ProjectID, &v.CWD, &v.Source, &v.CodexVersion, &v.StartedAt, &v.EndedAt, &v.LastActivityAt, &v.RunCount); err != nil {
+		if err = rows.Scan(&v.ID, &v.MachineID, &v.ProjectID, &v.CWD, &v.WorktreeName, &v.WorktreePath, &v.IsWorktree, &v.Source, &v.CodexVersion, &v.StartedAt, &v.EndedAt, &v.LastActivityAt, &v.RunCount); err != nil {
 			return nil, err
 		}
 		result = append(result, v)

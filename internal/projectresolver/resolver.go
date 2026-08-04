@@ -6,13 +6,18 @@ import (
 	"encoding/hex"
 	"net/url"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/mrksph/codex-tempo/internal/domain"
 )
 
-type Result struct{ ID, Fingerprint, Name, RootPath, RemoteHash string }
+type Result struct {
+	ID, Fingerprint, Name, RootPath, RemoteHash string
+	WorktreeName, WorktreePath                  string
+	IsWorktree                                  bool
+}
 
 func Resolve(ctx context.Context, cwd, machineID string, storePaths bool) Result {
 	real, err := filepath.EvalSymlinks(cwd)
@@ -26,14 +31,38 @@ func Resolve(ctx context.Context, cwd, machineID string, storePaths bool) Result
 	remote := normalizeRemote(git(ctx, root, "config", "--get", "remote.origin.url"))
 	key := remote
 	if key == "" {
-		key = machineID + "\x00" + real
+		key = machineID + "\x00" + root
 	}
 	fingerprint := hash(key)
-	result := Result{ID: domain.DeterministicUUID("project", fingerprint), Fingerprint: fingerprint, Name: filepath.Base(root), RemoteHash: hash(remote)}
+	projectName := filepath.Base(root)
+	if remote != "" {
+		projectName = path.Base(remote)
+	}
+	result := Result{
+		ID: domain.DeterministicUUID("project", fingerprint), Fingerprint: fingerprint,
+		Name: projectName, RemoteHash: hash(remote), WorktreeName: filepath.Base(root),
+		IsWorktree: isLinkedWorktree(ctx, root),
+	}
 	if storePaths {
-		result.RootPath = root
+		result.RootPath, result.WorktreePath = root, root
 	}
 	return result
+}
+
+func isLinkedWorktree(ctx context.Context, root string) bool {
+	gitDir := absoluteGitPath(root, git(ctx, root, "rev-parse", "--git-dir"))
+	commonDir := absoluteGitPath(root, git(ctx, root, "rev-parse", "--git-common-dir"))
+	return gitDir != "" && commonDir != "" && gitDir != commonDir
+}
+
+func absoluteGitPath(root, value string) string {
+	if value == "" {
+		return ""
+	}
+	if !filepath.IsAbs(value) {
+		value = filepath.Join(root, value)
+	}
+	return filepath.Clean(value)
 }
 
 func git(ctx context.Context, dir string, args ...string) string {

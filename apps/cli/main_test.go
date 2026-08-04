@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ func TestHookIntervalEventsCreateBoundedCompletedRun(t *testing.T) {
 	start := time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC)
 	events := hookIntervalEvents("machine", localdb.HookInterval{
 		SessionID: "codex-session", ProjectID: "project", ProjectName: "tempo",
+		WorktreeName: "feature", WorktreePath: "/workspace/feature", IsWorktree: true,
 		StartedAt: start, EndedAt: start.Add(25 * time.Second), Model: "gpt-5",
 	})
 	runs := projector.Project(events)
@@ -27,6 +29,17 @@ func TestHookIntervalEventsCreateBoundedCompletedRun(t *testing.T) {
 		if event.Source != "hook" {
 			t.Fatalf("source = %q", event.Source)
 		}
+	}
+	var payload struct {
+		WorktreeName string `json:"worktree_name"`
+		WorktreePath string `json:"worktree_path"`
+		IsWorktree   bool   `json:"is_worktree"`
+	}
+	if err := json.Unmarshal(events[0].Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.WorktreeName != "feature" || payload.WorktreePath != "/workspace/feature" || !payload.IsWorktree {
+		t.Fatalf("payload = %#v", payload)
 	}
 }
 

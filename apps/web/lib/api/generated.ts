@@ -228,6 +228,10 @@ export interface components {
             machine_id: string;
             /** Format: uuid */
             project_id: string;
+            cwd?: string;
+            worktree_name?: string;
+            worktree_path?: string;
+            is_worktree: boolean;
             source: string;
             codex_version?: string;
             /** Format: date-time */

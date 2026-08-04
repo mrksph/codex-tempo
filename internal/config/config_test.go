@@ -25,6 +25,9 @@ func TestLoadExpandsPathsAndDurations(t *testing.T) {
 	if cfg.ScanInterval != 5*time.Second {
 		t.Fatalf("scan interval = %s", cfg.ScanInterval)
 	}
+	if cfg.LogRetention != 14*24*time.Hour {
+		t.Fatalf("log retention = %s", cfg.LogRetention)
+	}
 }
 
 func TestSaveRoundTrip(t *testing.T) {
@@ -47,7 +50,7 @@ func TestSaveRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ServerURL != want.ServerURL || got.MachineToken != want.MachineToken || got.ScanInterval != want.ScanInterval {
+	if got.ServerURL != want.ServerURL || got.MachineToken != want.MachineToken || got.ScanInterval != want.ScanInterval || got.LogRetention != want.LogRetention {
 		t.Fatalf("round trip = %#v", got)
 	}
 }

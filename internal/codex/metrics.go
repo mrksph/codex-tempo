@@ -15,9 +15,10 @@ import (
 )
 
 type metricState struct {
-	SessionID, ProjectID, ProjectName, ProjectFingerprint, RemoteHash string
-	ActiveTurn, Model, ReasoningEffort                                string
-	Baseline, Current, Last                                           TokenUsage
+	SessionID, ProjectID, ProjectName, ProjectFingerprint, RemoteHash, WorktreeName, WorktreePath string
+	ActiveTurn, Model, ReasoningEffort                                                            string
+	IsWorktree                                                                                    bool
+	Baseline, Current, Last                                                                       TokenUsage
 }
 
 type MetricScanner struct {
@@ -75,6 +76,8 @@ func (s MetricScanner) Scan(ctx context.Context, path string, cursor localdb.Met
 						project := projectresolver.Resolve(ctx, payload.CWD, s.MachineID, s.StorePaths)
 						state.ProjectID, state.ProjectName = project.ID, project.Name
 						state.ProjectFingerprint, state.RemoteHash = project.Fingerprint, project.RemoteHash
+						state.WorktreeName, state.WorktreePath = project.WorktreeName, project.WorktreePath
+						state.IsWorktree = project.IsWorktree
 					}
 				case "turn_context":
 					state.Model, state.ReasoningEffort = payload.Model, payload.Effort
@@ -134,10 +137,12 @@ func max64(a, b int64) int64 {
 func metricEvents(machineID string, state metricState, at time.Time, usage TokenUsage) []domain.Event {
 	runID := domain.DeterministicUUID("metric-run", state.SessionID, state.ActiveTurn)
 	sessionID := "metrics:" + runID
-	projectPayload, _ := json.Marshal(map[string]string{
+	projectPayload, _ := json.Marshal(map[string]any{
 		"project_id": state.ProjectID, "project_name": state.ProjectName,
 		"project_fingerprint": state.ProjectFingerprint, "remote_hash": state.RemoteHash,
-		"model": state.Model, "reasoning_effort": state.ReasoningEffort,
+		"worktree_name": state.WorktreeName, "worktree_path": state.WorktreePath,
+		"is_worktree": state.IsWorktree,
+		"model":       state.Model, "reasoning_effort": state.ReasoningEffort,
 	})
 	tokenPayload, _ := json.Marshal(map[string]int64{
 		"input_tokens": usage.InputTokens, "cached_input_tokens": usage.CachedInputTokens,

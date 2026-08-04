@@ -3,6 +3,7 @@ package localdb
 import (
 	"context"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,7 +117,11 @@ func TestHookHeartbeatOnlyCreatesIntervalsWithinTimeout(t *testing.T) {
 	}
 	defer store.Close()
 	base := time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC)
-	heartbeat := HookHeartbeat{SessionID: "session", ProjectID: "project-a", ProjectName: "alpha", OccurredAt: base}
+	heartbeat := HookHeartbeat{
+		SessionID: "session", ProjectID: "project-a", ProjectName: "alpha",
+		WorktreeName: "feature", WorktreePath: "/workspace/feature", IsWorktree: true,
+		OccurredAt: base,
+	}
 
 	interval, err := store.AdvanceHookHeartbeat(ctx, heartbeat, 90*time.Second)
 	if err != nil || interval != nil {
@@ -124,7 +129,8 @@ func TestHookHeartbeatOnlyCreatesIntervalsWithinTimeout(t *testing.T) {
 	}
 	heartbeat.OccurredAt = base.Add(30 * time.Second)
 	interval, err = store.AdvanceHookHeartbeat(ctx, heartbeat, 90*time.Second)
-	if err != nil || interval == nil || interval.EndedAt.Sub(interval.StartedAt) != 30*time.Second {
+	if err != nil || interval == nil || interval.EndedAt.Sub(interval.StartedAt) != 30*time.Second ||
+		interval.WorktreeName != "feature" || interval.WorktreePath != "/workspace/feature" || !interval.IsWorktree {
 		t.Fatalf("active interval = %#v, %v", interval, err)
 	}
 
@@ -138,6 +144,90 @@ func TestHookHeartbeatOnlyCreatesIntervalsWithinTimeout(t *testing.T) {
 	interval, err = store.AdvanceHookHeartbeat(ctx, heartbeat, 90*time.Second)
 	if err != nil || interval == nil || interval.ProjectID != "project-b" || interval.EndedAt.Sub(interval.StartedAt) != 20*time.Second {
 		t.Fatalf("resumed interval = %#v, %v", interval, err)
+	}
+}
+
+func TestOpenKeepsSQLiteWaitBelowHookTimeout(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "tempo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	var timeoutMS int
+	if err = store.db.QueryRow("PRAGMA busy_timeout").Scan(&timeoutMS); err != nil {
+		t.Fatal(err)
+	}
+	if timeoutMS != 1000 {
+		t.Fatalf("busy timeout = %dms", timeoutMS)
+	}
+	var version int
+	if err = store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version != schemaVersion {
+		t.Fatalf("schema version = %d", version)
+	}
+}
+
+func TestOpenDoesNotMigrateCurrentSchemaDuringAnotherWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tempo.db")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	tx, err := store.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec("INSERT INTO metadata(key,value) VALUES('write-lock','held')"); err != nil {
+		t.Fatal(err)
+	}
+
+	other, err := Open(path)
+	if err != nil {
+		t.Fatalf("open current schema while write is active: %v", err)
+	}
+	other.Close()
+}
+
+func TestConcurrentHeartbeatsSerializeWriters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tempo.db")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.Close()
+
+	const workers = 30
+	start := make(chan struct{})
+	errors := make(chan error, workers)
+	var group sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			workerStore, openErr := Open(path)
+			if openErr != nil {
+				errors <- openErr
+				return
+			}
+			defer workerStore.Close()
+			<-start
+			_, heartbeatErr := workerStore.AdvanceHookHeartbeat(context.Background(), HookHeartbeat{
+				SessionID: uuid.NewString(), ProjectID: "project", ProjectName: "tempo", OccurredAt: time.Now().UTC(),
+			}, 90*time.Second)
+			if heartbeatErr != nil {
+				errors <- heartbeatErr
+			}
+		}()
+	}
+	close(start)
+	group.Wait()
+	close(errors)
+	for err := range errors {
+		t.Errorf("concurrent heartbeat: %v", err)
 	}
 }
 
