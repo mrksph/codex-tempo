@@ -147,10 +147,18 @@ func (p Parser) ParseFile(ctx context.Context, path string, cursor localdb.Curso
 				cursor.ProjectName = project.Name
 				cursor.ProjectFingerprint = project.Fingerprint
 				cursor.RemoteHash = project.RemoteHash
+				cursor.WorktreeName = project.WorktreeName
+				cursor.WorktreePath = project.WorktreePath
+				cursor.IsWorktree = project.IsWorktree
 			}
 		}
 		if event != nil && event.Kind == domain.EventSessionStarted {
-			body, _ := json.Marshal(map[string]any{"project_id": cursor.ProjectID, "project_name": cursor.ProjectName, "project_fingerprint": cursor.ProjectFingerprint, "remote_hash": cursor.RemoteHash, "codex_version": metadata.CLIVersion})
+			body, _ := json.Marshal(map[string]any{
+				"project_id": cursor.ProjectID, "project_name": cursor.ProjectName,
+				"project_fingerprint": cursor.ProjectFingerprint, "remote_hash": cursor.RemoteHash,
+				"worktree_name": cursor.WorktreeName, "worktree_path": cursor.WorktreePath,
+				"is_worktree": cursor.IsWorktree, "codex_version": metadata.CLIVersion,
+			})
 			event.Payload = body
 		}
 		if event != nil {

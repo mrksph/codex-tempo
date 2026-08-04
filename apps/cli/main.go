@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/mrksph/codex-tempo/internal/codex"
 	"github.com/mrksph/codex-tempo/internal/config"
 	"github.com/mrksph/codex-tempo/internal/domain"
+	"github.com/mrksph/codex-tempo/internal/hooklog"
 	"github.com/mrksph/codex-tempo/internal/interval"
 	"github.com/mrksph/codex-tempo/internal/localdb"
 	"github.com/mrksph/codex-tempo/internal/projector"
@@ -33,6 +35,10 @@ func main() {
 	}
 	cfg, err := config.Load(*configPath)
 	check(err)
+	if args[0] == "hook" {
+		runHookCommand(cfg)
+		return
+	}
 	store, err := localdb.Open(filepath.Join(cfg.DataDir, "tempo.db"))
 	check(err)
 	defer store.Close()
@@ -94,7 +100,10 @@ func main() {
 		check(err)
 		machineID, err := store.MachineID(ctx)
 		check(err)
-		printJSON(map[string]any{"machine_id": machineID, "database": filepath.Join(cfg.DataDir, "tempo.db"), "counts": diagnostics})
+		printJSON(map[string]any{
+			"machine_id": machineID, "database": filepath.Join(cfg.DataDir, "tempo.db"), "counts": diagnostics,
+			"hook_log_dir": filepath.Join(cfg.DataDir, "logs"), "log_retention": cfg.LogRetention.String(),
+		})
 	case "reparse":
 		check(store.ResetCursors(ctx))
 		fmt.Println("cursors reset; run codex-tempo-agent --once")
@@ -103,8 +112,6 @@ func main() {
 			usage()
 		}
 		importWakapi(ctx, cfg, store, args[2:])
-	case "hook":
-		runHook(cfg, store)
 	default:
 		usage()
 	}
@@ -119,15 +126,73 @@ type hookInput struct {
 	TranscriptPath *string `json:"transcript_path"`
 }
 
-func runHook(cfg config.Config, store *localdb.Store) {
+func runHookCommand(cfg config.Config) {
+	startedAt := time.Now()
+	fileLogger, logErr := hooklog.Open(cfg.DataDir, cfg.LogRetention)
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	if logErr == nil {
+		defer fileLogger.Close()
+		logger = fileLogger.Logger
+	}
+
 	var input hookInput
-	if json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&input) != nil || input.SessionID == "" {
+	if err := json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&input); err != nil {
+		logger.Error("hook completed", "status", "error", "stage", "decode_input", "error", err, "duration_ms", time.Since(startedAt).Milliseconds())
 		return
 	}
+	if input.SessionID == "" {
+		logger.Error("hook completed", "status", "error", "stage", "validate_input", "error", "session_id is required", "duration_ms", time.Since(startedAt).Milliseconds())
+		return
+	}
+	logger.Info("hook started", "hook_event", input.EventName, "session_id", input.SessionID, "turn_id", input.TurnID, "pid", os.Getpid())
+	store, err := localdb.Open(filepath.Join(cfg.DataDir, "tempo.db"))
+	if err != nil {
+		logger.Error("hook completed", "status", "error", "stage", "open_store", "error", err, "hook_event", input.EventName, "session_id", input.SessionID, "duration_ms", time.Since(startedAt).Milliseconds())
+		return
+	}
+	defer store.Close()
+	runHook(cfg, store, logger, input, startedAt)
+}
+
+func runHook(cfg config.Config, store *localdb.Store, logger *slog.Logger, input hookInput, startedAt time.Time) {
+	status, stage := "ok", "machine_id"
+	var finalErr error
+	var project projectresolver.Result
+	eventsEnqueued, metricEvents := 0, 0
+	syncAttempted, syncSucceeded := false, false
+	defer func() {
+		attributes := []any{
+			"status", status, "stage", stage, "hook_event", input.EventName,
+			"session_id", input.SessionID, "turn_id", input.TurnID,
+			"project_id", project.ID, "project_name", project.Name,
+			"worktree_name", project.WorktreeName, "is_worktree", project.IsWorktree,
+			"events_enqueued", eventsEnqueued, "metric_events", metricEvents,
+			"sync_attempted", syncAttempted, "sync_succeeded", syncSucceeded,
+			"duration_ms", time.Since(startedAt).Milliseconds(),
+		}
+		if cfg.Privacy.StorePaths {
+			attributes = append(attributes, "worktree_path", project.WorktreePath)
+		}
+		if finalErr != nil {
+			attributes = append(attributes, "error", finalErr)
+			logger.Error("hook completed", attributes...)
+			return
+		}
+		logger.Info("hook completed", attributes...)
+	}()
+	fail := func(failedStage string, err error) {
+		status, stage, finalErr = "error", failedStage, err
+	}
+	warn := func(failedStage string, err error) {
+		status = "degraded"
+		logger.Warn("hook step failed", "stage", failedStage, "error", err, "hook_event", input.EventName, "session_id", input.SessionID)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	machineID, err := store.MachineID(ctx)
 	if err != nil {
+		fail("machine_id", err)
 		return
 	}
 	if input.CWD == "" {
@@ -136,52 +201,80 @@ func runHook(cfg config.Config, store *localdb.Store) {
 	now := time.Now().UTC()
 	cutover, err := store.EnsureTimeMetadata(ctx, "hook_cutover_at", now)
 	if err != nil {
+		fail("ensure_cutover", err)
 		return
 	}
-	project := projectresolver.Resolve(ctx, input.CWD, machineID, cfg.Privacy.StorePaths)
+	project = projectresolver.Resolve(ctx, input.CWD, machineID, cfg.Privacy.StorePaths)
+	stage = "heartbeat"
 	item, err := store.AdvanceHookHeartbeat(ctx, localdb.HookHeartbeat{
 		SessionID: input.SessionID, ProjectID: project.ID, ProjectName: project.Name,
 		ProjectFingerprint: project.Fingerprint, RemoteHash: project.RemoteHash,
+		WorktreeName: project.WorktreeName, WorktreePath: project.WorktreePath, IsWorktree: project.IsWorktree,
 		Model: input.Model, OccurredAt: now,
 	}, cfg.HookActivityTimeout)
 	if err != nil {
+		fail("heartbeat", err)
 		return
 	}
 	if item != nil {
-		if err = store.Enqueue(ctx, hookIntervalEvents(machineID, *item)); err != nil {
+		events := hookIntervalEvents(machineID, *item)
+		if err = store.Enqueue(ctx, events); err != nil {
+			fail("enqueue", err)
 			return
 		}
+		eventsEnqueued = len(events)
 	}
 	if input.TranscriptPath != nil && *input.TranscriptPath != "" {
 		cursor, cursorErr := store.MetricCursor(ctx, *input.TranscriptPath)
-		if cursorErr == nil {
+		if cursorErr != nil {
+			warn("metric_cursor", cursorErr)
+		} else {
 			scanner := codex.MetricScanner{MachineID: machineID, StorePaths: cfg.Privacy.StorePaths}
-			cursor, metricEvents, scanErr := scanner.Scan(ctx, *input.TranscriptPath, cursor, cutover)
-			if scanErr == nil {
-				_ = store.CommitMetrics(ctx, cursor, metricEvents)
+			cursor, events, scanErr := scanner.Scan(ctx, *input.TranscriptPath, cursor, cutover)
+			if scanErr != nil {
+				warn("metric_scan", scanErr)
+			} else if commitErr := store.CommitMetrics(ctx, cursor, events); commitErr != nil {
+				warn("metric_commit", commitErr)
+			} else {
+				metricEvents = len(events)
 			}
 		}
 	}
 	if cfg.ServerURL == "" || cfg.MachineToken == "" {
+		stage = "complete"
 		return
 	}
 	lastSync, hasLastSync, err := store.TimeMetadata(ctx, "hook_last_sync_at")
-	if err != nil || hasLastSync && now.Sub(lastSync) < cfg.HookSyncInterval {
+	if err != nil {
+		fail("sync_metadata", err)
 		return
 	}
-	client := &ledgersync.Client{Store: store, ServerURL: cfg.ServerURL, Token: cfg.MachineToken, MachineID: machineID, HTTP: &http.Client{Timeout: time.Second}}
-	if client.SyncOnce(ctx) == nil {
-		_ = store.SetTimeMetadata(ctx, "hook_last_sync_at", now)
+	if hasLastSync && now.Sub(lastSync) < cfg.HookSyncInterval {
+		stage = "complete"
+		return
 	}
+	stage, syncAttempted = "sync", true
+	client := &ledgersync.Client{Store: store, ServerURL: cfg.ServerURL, Token: cfg.MachineToken, MachineID: machineID, HTTP: &http.Client{Timeout: time.Second}}
+	if err = client.SyncOnce(ctx); err != nil {
+		fail("sync", err)
+		return
+	}
+	syncSucceeded = true
+	if err = store.SetTimeMetadata(ctx, "hook_last_sync_at", now); err != nil {
+		fail("sync_metadata_write", err)
+		return
+	}
+	stage = "complete"
 }
 
 func hookIntervalEvents(machineID string, item localdb.HookInterval) []domain.Event {
 	runID := domain.DeterministicUUID("hook-run", item.SessionID, item.ProjectID, item.StartedAt.Format(time.RFC3339Nano), item.EndedAt.Format(time.RFC3339Nano))
 	sessionID := "hook:" + runID
-	payload, _ := json.Marshal(map[string]string{
+	payload, _ := json.Marshal(map[string]any{
 		"project_id": item.ProjectID, "project_name": item.ProjectName,
 		"project_fingerprint": item.ProjectFingerprint, "remote_hash": item.RemoteHash,
-		"model": item.Model,
+		"worktree_name": item.WorktreeName, "worktree_path": item.WorktreePath,
+		"is_worktree": item.IsWorktree, "model": item.Model,
 	})
 	return []domain.Event{
 		{ID: domain.DeterministicUUID("hook-event", runID, "session_started"), MachineID: machineID, SessionID: sessionID, Sequence: 1, OccurredAt: item.StartedAt, Kind: domain.EventSessionStarted, Source: "hook", Payload: payload},

@@ -48,6 +48,10 @@ Codex Tempo can run without a permanent background process. Its plugin uses the 
 
 Prompt, response, and tool contents are never stored. The transcript is read incrementally only to extract model metadata and token counters, which are recorded in zero-duration `metrics` runs and therefore cannot inflate tracked time. The first plugin heartbeat establishes a source cutover: later Wakapi imports stop at that timestamp so they cannot overlap future hook intervals.
 
+Git checkouts and linked worktrees with the same normalized `remote.origin.url` share one project ID. Sessions retain the worktree name and linked-worktree flag; when `privacy.store_paths` is enabled they also retain the worktree root path. Repositories without an origin use their physical root path as identity, so separate worktrees remain separate projects in that case.
+
+Every hook writes structured diagnostics to `data_dir/logs/hook-YYYY-MM-DD.jsonl`. Files rotate daily and logs older than `log_retention` are removed. Logs contain lifecycle identifiers, project/worktree metadata, stage timings, queue activity, and errors, but never prompt or tool content.
+
 The systemd agent remains available as an optional transcript-import fallback, but it is not required when the plugin is enabled and should not run alongside hook capture for normal usage. A direct hooks file remains available at `deploy/codex/hooks.json` for installations that do not use the plugin.
 
 Relevant configuration:
@@ -55,6 +59,7 @@ Relevant configuration:
 ```toml
 hook_sync_interval = "30s"
 hook_activity_timeout = "90s"
+log_retention = "336h"
 ```
 
 Import historical coding time from the Wakapi server configured in `~/.wakatime.cfg`:

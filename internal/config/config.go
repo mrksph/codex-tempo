@@ -19,6 +19,7 @@ type Config struct {
 	SyncInterval        time.Duration `toml:"sync_interval"`
 	HookSyncInterval    time.Duration `toml:"hook_sync_interval"`
 	HookActivityTimeout time.Duration `toml:"hook_activity_timeout"`
+	LogRetention        time.Duration `toml:"log_retention"`
 	MachineName         string        `toml:"machine_name"`
 	Privacy             Privacy       `toml:"privacy"`
 }
@@ -40,6 +41,7 @@ type diskConfig struct {
 	SyncInterval        string  `toml:"sync_interval"`
 	HookSyncInterval    string  `toml:"hook_sync_interval"`
 	HookActivityTimeout string  `toml:"hook_activity_timeout"`
+	LogRetention        string  `toml:"log_retention"`
 	Privacy             Privacy `toml:"privacy"`
 }
 
@@ -52,6 +54,7 @@ func Default() Config {
 		SyncInterval:        30 * time.Second,
 		HookSyncInterval:    30 * time.Second,
 		HookActivityTimeout: 90 * time.Second,
+		LogRetention:        14 * 24 * time.Hour,
 		Privacy:             Privacy{StoreToolNames: true},
 	}
 }
@@ -80,6 +83,9 @@ func Load(path string) (Config, error) {
 	if cfg.HookActivityTimeout <= 0 {
 		cfg.HookActivityTimeout = 90 * time.Second
 	}
+	if cfg.LogRetention <= 0 {
+		cfg.LogRetention = 14 * 24 * time.Hour
+	}
 	return cfg, nil
 }
 
@@ -105,7 +111,8 @@ func Save(path string, cfg Config) error {
 		MachineToken: cfg.MachineToken, MachineName: cfg.MachineName,
 		ScanInterval: cfg.ScanInterval.String(), SyncInterval: cfg.SyncInterval.String(),
 		HookSyncInterval: cfg.HookSyncInterval.String(), HookActivityTimeout: cfg.HookActivityTimeout.String(),
-		Privacy: cfg.Privacy,
+		LogRetention: cfg.LogRetention.String(),
+		Privacy:      cfg.Privacy,
 	}
 	if err = toml.NewEncoder(temporary).Encode(disk); err != nil {
 		temporary.Close()

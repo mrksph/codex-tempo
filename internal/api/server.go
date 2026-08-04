@@ -85,25 +85,50 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
+	startedAt := time.Now()
 	var input ingestRequest
 	if err := decodeJSON(w, r, &input); err != nil {
+		s.logIngest(r, input.MachineID, 0, nil, time.Since(startedAt), err)
 		return
 	}
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if err := s.Store.AuthenticateMachine(r.Context(), input.MachineID, token); err != nil {
+		s.logIngest(r, input.MachineID, len(input.Events), nil, time.Since(startedAt), err)
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 	if len(input.Events) > 5000 {
+		s.logIngest(r, input.MachineID, len(input.Events), nil, time.Since(startedAt), errors.New("batch exceeds 5000 events"))
 		writeError(w, http.StatusRequestEntityTooLarge, "batch exceeds 5000 events")
 		return
 	}
 	result, err := s.Store.Ingest(r.Context(), input.MachineID, input.Events)
 	if err != nil {
+		s.logIngest(r, input.MachineID, len(input.Events), nil, time.Since(startedAt), err)
 		s.fail(w, r, err)
 		return
 	}
+	s.logIngest(r, input.MachineID, len(input.Events), &result, time.Since(startedAt), nil)
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) logIngest(r *http.Request, machineID string, eventCount int, result *postgres.IngestResult, duration time.Duration, err error) {
+	if s.Logger == nil {
+		return
+	}
+	attributes := []any{
+		"request_id", middleware.GetReqID(r.Context()), "machine_id", machineID,
+		"event_count", eventCount, "duration_ms", duration.Milliseconds(),
+	}
+	if result != nil {
+		attributes = append(attributes, "accepted", result.Accepted, "duplicates", result.Duplicates, "rejected", len(result.Rejected))
+	}
+	if err != nil {
+		attributes = append(attributes, "error", err)
+		s.Logger.Warn("event ingest failed", attributes...)
+		return
+	}
+	s.Logger.Info("events ingested", attributes...)
 }
 
 func (s *Server) projects(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +280,7 @@ func writeError(w http.ResponseWriter, status int, message string) {
 }
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	if s.Logger != nil {
-		s.Logger.Error("request failed", "request_id", middleware.GetReqID(r.Context()), "error", err)
+		s.Logger.Error("request failed", "request_id", middleware.GetReqID(r.Context()), "method", r.Method, "path", r.URL.Path, "error", err)
 	}
 	writeError(w, http.StatusInternalServerError, "internal server error")
 }

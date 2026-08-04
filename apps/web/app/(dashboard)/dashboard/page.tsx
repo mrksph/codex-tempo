@@ -1,9 +1,10 @@
-import { ActivityRangeSelect, type ActivityRange } from "@/components/activity-range-select";
+import type { ActivityRange } from "@/components/activity-range-select";
+import { ActivityTimelinePanel } from "@/components/activity-timeline-panel";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { Metric } from "@/components/metric";
 import { PageHeader } from "@/components/page-header";
 import { ProjectChart } from "@/components/project-chart";
-import { Timeline } from "@/components/timeline";
-import { tempoFetch, recentRange, todayRange } from "@/lib/api/client";
+import { tempoFetch, calendarRecentRange, recentRange, todayRange } from "@/lib/api/client";
 import type { Project, Run, Summary } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const selectedRange: ActivityRange = requestedRange && requestedRange in ACTIVITY_RANGES ? requestedRange as ActivityRange : "24h";
   const activityRangeConfig = ACTIVITY_RANGES[selectedRange];
   const range = todayRange(); const query = new URLSearchParams(range).toString();
-  const activityRange = recentRange(activityRangeConfig.days);
+  const activityRange = selectedRange === "24h"
+    ? recentRange(1)
+    : calendarRecentRange(activityRangeConfig.days);
   const activityQuery = new URLSearchParams(activityRange).toString();
   const [summaryData, projectData, timelineData] = await Promise.all([
     tempoFetch<Summary>(`/api/v1/reports/summary?${query}`),
@@ -40,17 +43,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <Metric label="Intervalos" value={String(summaryData.run_count)} meta="Tramos iniciados hoy"/>
       <Metric label="Tokens" value={compact(summaryData.input_tokens + summaryData.output_tokens)} meta={`${compact(summaryData.output_tokens)} de salida`}/>
     </section>
-    <section className="panel activity-panel" id="activity">
-      <div className="panel-head">
-        <div><h2 className="panel-title">{activityRangeConfig.title}</h2><p className="panel-note">Proyectos con trabajo registrado, ordenados por actividad reciente</p></div>
-        <div className="panel-actions">
-          <span className="panel-subtitle">{activityProjectCount} proyectos</span>
-          <ActivityRangeSelect value={selectedRange}/>
-        </div>
-      </div>
-      <Timeline runs={timelineData.runs} projects={projectData.projects} from={timelineData.from} to={timelineData.to}/>
-    </section>
-    <section className="panel"><div className="panel-head"><div><h2 className="panel-title">Tiempo por proyecto</h2><p className="panel-note">Tiempo de agente acumulado hoy</p></div><span className="panel-subtitle">{chartValues.length} proyectos</span></div><ProjectChart values={chartValues}/></section>
+    <ActivityTimelinePanel
+      from={timelineData.from}
+      key={selectedRange}
+      meta={`${activityProjectCount} proyectos`}
+      note="Proyectos con trabajo registrado, ordenados por actividad reciente"
+      projects={projectData.projects}
+      range={selectedRange}
+      runs={timelineData.runs}
+      title={activityRangeConfig.title}
+      to={timelineData.to}
+    />
+    <section className="panel"><AutoRefresh/><div className="panel-head"><div><h2 className="panel-title">Tiempo por proyecto</h2><p className="panel-note">Tiempo de agente acumulado hoy</p></div><span className="panel-subtitle">{chartValues.length} proyectos</span></div><ProjectChart values={chartValues}/></section>
   </>;
 }
 

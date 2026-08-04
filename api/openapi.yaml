@@ -202,11 +202,15 @@ components:
         last_active_at: { type: [string, "null"], format: date-time }
     Session:
       type: object
-      required: [id, machine_id, project_id, source, started_at, last_activity_at, run_count]
+      required: [id, machine_id, project_id, is_worktree, source, started_at, last_activity_at, run_count]
       properties:
         id: { type: string }
         machine_id: { type: string, format: uuid }
         project_id: { type: string, format: uuid }
+        cwd: { type: string }
+        worktree_name: { type: string }
+        worktree_path: { type: string }
+        is_worktree: { type: boolean }
         source: { type: string }
         codex_version: { type: string }
         started_at: { type: string, format: date-time }

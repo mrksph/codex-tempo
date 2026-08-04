@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,22 +19,34 @@ import (
 
 type Store struct{ db *sql.DB }
 
+const schemaVersion = 1
+
 type Cursor struct {
-	Path, FileIdentity                                                                  string
-	ByteOffset                                                                          int64
-	LastEventID, SessionID, ProjectID, ProjectName, ProjectFingerprint, RemoteHash, CWD string
-	LastSequence                                                                        int64
-	LastModified                                                                        time.Time
+	Path, FileIdentity              string
+	ByteOffset                      int64
+	LastEventID, SessionID          string
+	ProjectID, ProjectName          string
+	ProjectFingerprint, RemoteHash  string
+	CWD, WorktreeName, WorktreePath string
+	IsWorktree                      bool
+	LastSequence                    int64
+	LastModified                    time.Time
 }
 
 type HookHeartbeat struct {
-	SessionID, ProjectID, ProjectName, ProjectFingerprint, RemoteHash, Model string
-	OccurredAt                                                               time.Time
+	SessionID, ProjectID, ProjectName string
+	ProjectFingerprint, RemoteHash    string
+	WorktreeName, WorktreePath, Model string
+	IsWorktree                        bool
+	OccurredAt                        time.Time
 }
 
 type HookInterval struct {
-	StartedAt, EndedAt                                                       time.Time
-	SessionID, ProjectID, ProjectName, ProjectFingerprint, RemoteHash, Model string
+	StartedAt, EndedAt                time.Time
+	SessionID, ProjectID, ProjectName string
+	ProjectFingerprint, RemoteHash    string
+	WorktreeName, WorktreePath, Model string
+	IsWorktree                        bool
 }
 
 type MetricCursor struct {
@@ -46,18 +60,29 @@ func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", path)
+	dsn := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	query := dsn.Query()
+	query.Set("_txlock", "immediate")
+	query.Add("_pragma", "busy_timeout(1000)")
+	query.Add("_pragma", "foreign_keys(ON)")
+	query.Add("_pragma", "synchronous(NORMAL)")
+	dsn.RawQuery = query.Encode()
+	db, err := sql.Open("sqlite", dsn.String())
 	if err != nil {
 		return nil, err
 	}
-	for _, pragma := range []string{"PRAGMA journal_mode=WAL", "PRAGMA foreign_keys=ON", "PRAGMA synchronous=NORMAL", "PRAGMA busy_timeout=5000"} {
-		if _, err = db.Exec(pragma); err != nil {
-			db.Close()
-			return nil, err
+	s := &Store{db: db}
+	var currentVersion int
+	if err = db.QueryRow("PRAGMA user_version").Scan(&currentVersion); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if currentVersion < schemaVersion {
+		if _, err = db.Exec("PRAGMA journal_mode=WAL"); err == nil {
+			err = s.migrate()
 		}
 	}
-	s := &Store{db: db}
-	if err = s.migrate(); err != nil {
+	if err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -73,7 +98,8 @@ CREATE TABLE IF NOT EXISTS transcript_cursors (
  path TEXT PRIMARY KEY, file_identity TEXT NOT NULL, byte_offset INTEGER NOT NULL DEFAULT 0,
  last_event_id TEXT NOT NULL DEFAULT '', last_sequence INTEGER NOT NULL DEFAULT 0,
  session_id TEXT NOT NULL DEFAULT '', project_id TEXT NOT NULL DEFAULT '', project_name TEXT NOT NULL DEFAULT '',
- project_fingerprint TEXT NOT NULL DEFAULT '', remote_hash TEXT NOT NULL DEFAULT '', cwd TEXT NOT NULL DEFAULT '',
+	project_fingerprint TEXT NOT NULL DEFAULT '', remote_hash TEXT NOT NULL DEFAULT '', cwd TEXT NOT NULL DEFAULT '',
+	worktree_name TEXT NOT NULL DEFAULT '', worktree_path TEXT NOT NULL DEFAULT '', is_worktree INTEGER NOT NULL DEFAULT 0,
  last_modified TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS events (
@@ -91,7 +117,8 @@ CREATE TABLE IF NOT EXISTS parser_errors (
 CREATE TABLE IF NOT EXISTS hook_heartbeats (
  session_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, project_id TEXT NOT NULL,
  project_name TEXT NOT NULL, project_fingerprint TEXT NOT NULL, remote_hash TEXT NOT NULL DEFAULT '',
- model TEXT NOT NULL DEFAULT ''
+	worktree_name TEXT NOT NULL DEFAULT '', worktree_path TEXT NOT NULL DEFAULT '', is_worktree INTEGER NOT NULL DEFAULT 0,
+	model TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS metric_cursors (
  path TEXT PRIMARY KEY, file_identity TEXT NOT NULL, byte_offset INTEGER NOT NULL DEFAULT 0,
@@ -104,10 +131,19 @@ CREATE TABLE IF NOT EXISTS metric_cursors (
 		"ALTER TABLE transcript_cursors ADD COLUMN project_name TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE transcript_cursors ADD COLUMN project_fingerprint TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE transcript_cursors ADD COLUMN remote_hash TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE transcript_cursors ADD COLUMN worktree_name TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE transcript_cursors ADD COLUMN worktree_path TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE transcript_cursors ADD COLUMN is_worktree INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE hook_heartbeats ADD COLUMN worktree_name TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE hook_heartbeats ADD COLUMN worktree_path TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE hook_heartbeats ADD COLUMN is_worktree INTEGER NOT NULL DEFAULT 0",
 	} {
-		_, _ = s.db.Exec(statement)
+		if _, err = s.db.Exec(statement); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			return err
+		}
 	}
-	return nil
+	_, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", schemaVersion))
+	return err
 }
 
 // AdvanceHookHeartbeat returns a work interval only when two consecutive hooks
@@ -121,8 +157,8 @@ func (s *Store) AdvanceHookHeartbeat(ctx context.Context, heartbeat HookHeartbea
 
 	var previous HookHeartbeat
 	var occurredAt string
-	err = tx.QueryRowContext(ctx, `SELECT session_id,occurred_at,project_id,project_name,project_fingerprint,remote_hash,model FROM hook_heartbeats WHERE session_id=?`, heartbeat.SessionID).
-		Scan(&previous.SessionID, &occurredAt, &previous.ProjectID, &previous.ProjectName, &previous.ProjectFingerprint, &previous.RemoteHash, &previous.Model)
+	err = tx.QueryRowContext(ctx, `SELECT session_id,occurred_at,project_id,project_name,project_fingerprint,remote_hash,worktree_name,worktree_path,is_worktree,model FROM hook_heartbeats WHERE session_id=?`, heartbeat.SessionID).
+		Scan(&previous.SessionID, &occurredAt, &previous.ProjectID, &previous.ProjectName, &previous.ProjectFingerprint, &previous.RemoteHash, &previous.WorktreeName, &previous.WorktreePath, &previous.IsWorktree, &previous.Model)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -137,7 +173,7 @@ func (s *Store) AdvanceHookHeartbeat(ctx context.Context, heartbeat HookHeartbea
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, `INSERT INTO hook_heartbeats(session_id,occurred_at,project_id,project_name,project_fingerprint,remote_hash,model) VALUES(?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET occurred_at=excluded.occurred_at,project_id=excluded.project_id,project_name=excluded.project_name,project_fingerprint=excluded.project_fingerprint,remote_hash=excluded.remote_hash,model=excluded.model`, heartbeat.SessionID, heartbeat.OccurredAt.UTC().Format(time.RFC3339Nano), heartbeat.ProjectID, heartbeat.ProjectName, heartbeat.ProjectFingerprint, heartbeat.RemoteHash, heartbeat.Model)
+	_, err = tx.ExecContext(ctx, `INSERT INTO hook_heartbeats(session_id,occurred_at,project_id,project_name,project_fingerprint,remote_hash,worktree_name,worktree_path,is_worktree,model) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET occurred_at=excluded.occurred_at,project_id=excluded.project_id,project_name=excluded.project_name,project_fingerprint=excluded.project_fingerprint,remote_hash=excluded.remote_hash,worktree_name=excluded.worktree_name,worktree_path=excluded.worktree_path,is_worktree=excluded.is_worktree,model=excluded.model`, heartbeat.SessionID, heartbeat.OccurredAt.UTC().Format(time.RFC3339Nano), heartbeat.ProjectID, heartbeat.ProjectName, heartbeat.ProjectFingerprint, heartbeat.RemoteHash, heartbeat.WorktreeName, heartbeat.WorktreePath, heartbeat.IsWorktree, heartbeat.Model)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +190,9 @@ func (s *Store) AdvanceHookHeartbeat(ctx context.Context, heartbeat HookHeartbea
 	return &HookInterval{
 		StartedAt: previous.OccurredAt, EndedAt: heartbeat.OccurredAt,
 		SessionID: previous.SessionID, ProjectID: previous.ProjectID, ProjectName: previous.ProjectName,
-		ProjectFingerprint: previous.ProjectFingerprint, RemoteHash: previous.RemoteHash, Model: previous.Model,
+		ProjectFingerprint: previous.ProjectFingerprint, RemoteHash: previous.RemoteHash,
+		WorktreeName: previous.WorktreeName, WorktreePath: previous.WorktreePath, IsWorktree: previous.IsWorktree,
+		Model: previous.Model,
 	}, nil
 }
 
@@ -247,8 +285,8 @@ func (s *Store) SetTimeMetadata(ctx context.Context, key string, value time.Time
 func (s *Store) Cursor(ctx context.Context, path string) (Cursor, error) {
 	var c Cursor
 	var modified string
-	err := s.db.QueryRowContext(ctx, `SELECT path,file_identity,byte_offset,last_event_id,last_sequence,session_id,project_id,project_name,project_fingerprint,remote_hash,cwd,last_modified FROM transcript_cursors WHERE path=?`, path).
-		Scan(&c.Path, &c.FileIdentity, &c.ByteOffset, &c.LastEventID, &c.LastSequence, &c.SessionID, &c.ProjectID, &c.ProjectName, &c.ProjectFingerprint, &c.RemoteHash, &c.CWD, &modified)
+	err := s.db.QueryRowContext(ctx, `SELECT path,file_identity,byte_offset,last_event_id,last_sequence,session_id,project_id,project_name,project_fingerprint,remote_hash,cwd,worktree_name,worktree_path,is_worktree,last_modified FROM transcript_cursors WHERE path=?`, path).
+		Scan(&c.Path, &c.FileIdentity, &c.ByteOffset, &c.LastEventID, &c.LastSequence, &c.SessionID, &c.ProjectID, &c.ProjectName, &c.ProjectFingerprint, &c.RemoteHash, &c.CWD, &c.WorktreeName, &c.WorktreePath, &c.IsWorktree, &modified)
 	if err == sql.ErrNoRows {
 		c.Path = path
 		return c, nil
@@ -276,7 +314,7 @@ func (s *Store) CommitParsed(ctx context.Context, cursor Cursor, events []domain
 			return err
 		}
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO transcript_cursors(path,file_identity,byte_offset,last_event_id,last_sequence,session_id,project_id,project_name,project_fingerprint,remote_hash,cwd,last_modified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET file_identity=excluded.file_identity,byte_offset=excluded.byte_offset,last_event_id=excluded.last_event_id,last_sequence=excluded.last_sequence,session_id=excluded.session_id,project_id=excluded.project_id,project_name=excluded.project_name,project_fingerprint=excluded.project_fingerprint,remote_hash=excluded.remote_hash,cwd=excluded.cwd,last_modified=excluded.last_modified`, cursor.Path, cursor.FileIdentity, cursor.ByteOffset, cursor.LastEventID, cursor.LastSequence, cursor.SessionID, cursor.ProjectID, cursor.ProjectName, cursor.ProjectFingerprint, cursor.RemoteHash, cursor.CWD, cursor.LastModified.UTC().Format(time.RFC3339Nano))
+	_, err = tx.ExecContext(ctx, `INSERT INTO transcript_cursors(path,file_identity,byte_offset,last_event_id,last_sequence,session_id,project_id,project_name,project_fingerprint,remote_hash,cwd,worktree_name,worktree_path,is_worktree,last_modified) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET file_identity=excluded.file_identity,byte_offset=excluded.byte_offset,last_event_id=excluded.last_event_id,last_sequence=excluded.last_sequence,session_id=excluded.session_id,project_id=excluded.project_id,project_name=excluded.project_name,project_fingerprint=excluded.project_fingerprint,remote_hash=excluded.remote_hash,cwd=excluded.cwd,worktree_name=excluded.worktree_name,worktree_path=excluded.worktree_path,is_worktree=excluded.is_worktree,last_modified=excluded.last_modified`, cursor.Path, cursor.FileIdentity, cursor.ByteOffset, cursor.LastEventID, cursor.LastSequence, cursor.SessionID, cursor.ProjectID, cursor.ProjectName, cursor.ProjectFingerprint, cursor.RemoteHash, cursor.CWD, cursor.WorktreeName, cursor.WorktreePath, cursor.IsWorktree, cursor.LastModified.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return err
 	}

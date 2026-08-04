@@ -6,6 +6,7 @@ scan_interval = "15s"
 sync_interval = "30s"
 hook_sync_interval = "30s"
 hook_activity_timeout = "90s"
+log_retention = "336h"
 
 [privacy]
 store_paths = false
