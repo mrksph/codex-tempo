@@ -1,0 +1,12 @@
+{
+  "name": "codex-tempo",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @codex-tempo/web dev",
+    "build": "pnpm --filter @codex-tempo/web build",
+    "lint": "pnpm --filter @codex-tempo/web lint",
+    "typecheck": "pnpm --filter @codex-tempo/web typecheck",
+    "generate:api": "pnpm --filter @codex-tempo/web generate:api"
+  }
+}

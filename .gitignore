@@ -1,0 +1,15 @@
+.env*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.dump
+*.tsbuildinfo
+node_modules/
+.next/
+dist/
+coverage/
+bin/
+output/
+.playwright-cli/
+.DS_Store

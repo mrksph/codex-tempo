@@ -1,0 +1,223 @@
+openapi: 3.1.0
+info:
+  title: Codex Tempo API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /ingest/register:
+    post:
+      operationId: registerMachine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                machine_id: { type: string, format: uuid }
+                name: { type: string }
+      responses:
+        "201":
+          description: Registered machine
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [machine_id, token]
+                properties:
+                  machine_id: { type: string, format: uuid }
+                  token: { type: string }
+  /ingest/events:
+    post:
+      operationId: ingestEvents
+      security: [{ machineToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IngestRequest" }
+      responses:
+        "200":
+          description: Batch result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestResponse" }
+  /reports/summary:
+    get:
+      operationId: getSummary
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Calculated summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Summary" }
+  /reports/timeline:
+    get:
+      operationId: getTimeline
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Timeline runs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, runs]
+                properties:
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+                  runs: { type: array, items: { $ref: "#/components/schemas/Run" } }
+  /projects:
+    get:
+      operationId: listProjects
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projects]
+                properties: { projects: { type: array, items: { $ref: "#/components/schemas/Project" } } }
+  /runs/active:
+    get:
+      operationId: listActiveRuns
+      responses:
+        "200":
+          description: Active runs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties: { runs: { type: array, items: { $ref: "#/components/schemas/Run" } } }
+  /sessions:
+    get:
+      operationId: listSessions
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties: { sessions: { type: array, items: { $ref: "#/components/schemas/Session" } } }
+  /machines:
+    get:
+      operationId: listMachines
+      responses:
+        "200":
+          description: Machine list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [machines]
+                properties: { machines: { type: array, items: { $ref: "#/components/schemas/Machine" } } }
+components:
+  securitySchemes:
+    machineToken: { type: http, scheme: bearer }
+  parameters:
+    From: { name: from, in: query, schema: { type: string, format: date-time } }
+    To: { name: to, in: query, schema: { type: string, format: date-time } }
+    ProjectId: { name: project_id, in: query, schema: { type: string, format: uuid } }
+  schemas:
+    Event:
+      type: object
+      required: [id, session_id, sequence, occurred_at, kind, source]
+      properties:
+        id: { type: string, format: uuid }
+        session_id: { type: string }
+        run_id: { type: string, format: uuid }
+        sequence: { type: integer, format: int64 }
+        occurred_at: { type: string, format: date-time }
+        kind: { type: string }
+        source: { type: string }
+        payload: { type: object, additionalProperties: true }
+    IngestRequest:
+      type: object
+      required: [machine_id, events]
+      properties:
+        machine_id: { type: string, format: uuid }
+        events: { type: array, maxItems: 5000, items: { $ref: "#/components/schemas/Event" } }
+    IngestResponse:
+      type: object
+      required: [accepted, duplicates, rejected]
+      properties:
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        rejected: { type: array, items: { type: object, properties: { id: { type: string }, reason: { type: string } } } }
+    Run:
+      type: object
+      required: [id, session_id, project_id, started_at, last_activity_at, status, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens]
+      properties:
+        id: { type: string, format: uuid }
+        session_id: { type: string }
+        project_id: { type: string, format: uuid }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+        last_activity_at: { type: string, format: date-time }
+        status: { type: string }
+        model: { type: string }
+        reasoning_effort: { type: string }
+        input_tokens: { type: integer, format: int64 }
+        cached_input_tokens: { type: integer, format: int64 }
+        output_tokens: { type: integer, format: int64 }
+        reasoning_tokens: { type: integer, format: int64 }
+        close_reason: { type: string }
+    Summary:
+      type: object
+      required: [from, to, agent_seconds, wall_clock_seconds, project_span_seconds, parallelism_peak, parallelism_average, run_count, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        agent_seconds: { type: number }
+        wall_clock_seconds: { type: number }
+        project_span_seconds: { type: object, additionalProperties: { type: number } }
+        parallelism_peak: { type: integer }
+        parallelism_average: { type: number }
+        run_count: { type: integer }
+        input_tokens: { type: integer, format: int64 }
+        output_tokens: { type: integer, format: int64 }
+        cached_input_tokens: { type: integer, format: int64 }
+        reasoning_tokens: { type: integer, format: int64 }
+    Project:
+      type: object
+      required: [id, name, run_count, agent_seconds]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        run_count: { type: integer, format: int64 }
+        agent_seconds: { type: number }
+        last_active_at: { type: [string, "null"], format: date-time }
+    Session:
+      type: object
+      required: [id, machine_id, project_id, source, started_at, last_activity_at, run_count]
+      properties:
+        id: { type: string }
+        machine_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        source: { type: string }
+        codex_version: { type: string }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+        last_activity_at: { type: string, format: date-time }
+        run_count: { type: integer, format: int64 }
+    Machine:
+      type: object
+      required: [id, name, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: [string, "null"], format: date-time }

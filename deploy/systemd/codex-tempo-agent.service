@@ -1,0 +1,11 @@
+[Unit]
+Description=Codex Tempo Agent
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/codex-tempo-agent
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

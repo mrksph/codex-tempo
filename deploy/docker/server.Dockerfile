@@ -1,0 +1,12 @@
+FROM golang:1.24-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY apps ./apps
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/codex-tempo-server ./apps/server
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/codex-tempo-server /usr/local/bin/codex-tempo-server
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/codex-tempo-server"]

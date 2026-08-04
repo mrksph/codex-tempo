@@ -1,0 +1,5 @@
+{"timestamp":"2026-08-04T10:05:00Z","type":"session_meta","payload":{"id":"session-b","cwd":"/workspace/project-b","cli_version":"1.0.0","source":"cli"}}
+{"timestamp":"2026-08-04T10:05:00Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-b","started_at":"2026-08-04T10:05:00Z"}}
+{"timestamp":"2026-08-04T10:05:01Z","type":"turn_context","payload":{"turn_id":"turn-b","cwd":"/workspace/project-b","model":"gpt-5","effort":"medium"}}
+{"timestamp":"2026-08-04T10:24:59Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":800,"cached_input_tokens":200,"output_tokens":250,"reasoning_output_tokens":80}}}}
+{"timestamp":"2026-08-04T10:25:00Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-b","completed_at":"2026-08-04T10:25:00Z"}}

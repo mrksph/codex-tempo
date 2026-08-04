@@ -1,0 +1,4 @@
+{"id":"a-start","machine_id":"machine-1","session_id":"session-a","run_id":"run-a","sequence":1,"occurred_at":"2026-08-04T10:00:00Z","kind":"run_started","source":"fixture","payload":{"project_id":"project-a"}}
+{"id":"b-start","machine_id":"machine-1","session_id":"session-b","run_id":"run-b","sequence":1,"occurred_at":"2026-08-04T10:05:00Z","kind":"run_started","source":"fixture","payload":{"project_id":"project-b"}}
+{"id":"a-end","machine_id":"machine-1","session_id":"session-a","run_id":"run-a","sequence":2,"occurred_at":"2026-08-04T10:20:00Z","kind":"run_completed","source":"fixture","payload":{}}
+{"id":"b-end","machine_id":"machine-1","session_id":"session-b","run_id":"run-b","sequence":2,"occurred_at":"2026-08-04T10:25:00Z","kind":"run_completed","source":"fixture","payload":{}}

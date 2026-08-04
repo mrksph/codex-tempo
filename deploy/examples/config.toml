@@ -1,0 +1,14 @@
+data_dir = "~/.local/share/codex-tempo"
+codex_home = "~/.codex"
+server_url = "https://tempo.example.com"
+machine_token = "replace-after-registration"
+scan_interval = "15s"
+sync_interval = "30s"
+hook_sync_interval = "30s"
+hook_activity_timeout = "90s"
+
+[privacy]
+store_paths = false
+store_tool_names = true
+store_prompt_metadata = false
+store_content = false

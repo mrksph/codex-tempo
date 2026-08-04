@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+apps/web/.next
+apps/web/node_modules
+bin
+output
+*.db
+*.db-shm
+*.db-wal
