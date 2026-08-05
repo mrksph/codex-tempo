@@ -6,6 +6,7 @@ import type { Project, Run } from "@/lib/api/types";
 
 const PROJECT_COLORS = ["#167c5a", "#147c8d", "#b76b12", "#7857a4", "#b64c5b", "#526f8a", "#9a5f36", "#4f766b"];
 const DISPLAY_TIME_ZONE = "Europe/Madrid";
+const HOUR_MS = 60 * 60 * 1000;
 
 type Interval = {
   start: number;
@@ -41,6 +42,7 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
   const baseFinish = new Date(to).getTime();
   const displayStart = alignStartToDay ? startOfLocalDay(baseStart) : baseStart;
   const [selection, setSelection] = useState<{ anchor: number; focus: number } | null>(null);
+  const [hoverHint, setHoverHint] = useState<"center" | "start" | "end">("center");
   const start = zoom?.start ?? displayStart;
   const finish = zoom?.end ?? baseFinish;
   const span = Math.max(1, finish - start);
@@ -77,15 +79,15 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
     if (hoverGuide.current) {
       hoverGuide.current.style.left = `${point.left}px`;
       hoverGuide.current.style.opacity = "1";
-      hoverGuide.current.classList.toggle("near-start", point.ratio < 0.08);
-      hoverGuide.current.classList.toggle("near-end", point.ratio > 0.92);
     }
-    if (hoverLabel.current) hoverLabel.current.textContent = formatHoverTime(point.time);
+    setHoverHint(point.ratio < 0.08 ? "start" : point.ratio > 0.92 ? "end" : "center");
+    if (hoverLabel.current) hoverLabel.current.textContent = formatTimelineLabel(point.time);
     return point.time;
   }
 
   function hideHover() {
     if (hoverGuide.current) hoverGuide.current.style.opacity = "0";
+    setHoverHint("center");
   }
 
   function beginSelection(event: PointerEvent<HTMLDivElement>) {
@@ -113,20 +115,20 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
     onZoomChange({ start: nextStart, end: nextEnd });
   }
 
-  return <div className="activity-timeline" role="region" aria-label="Activity by project in the selected period">
-      <div className="activity-labels">
-        <div className="activity-axis-spacer" />
-        {activity.map((project) => <div className="activity-project" key={project.id}>
-          <Link className="activity-project-name" href={`/projects/${project.id}`} title={`View ${project.name}`}>
-            <span className="activity-project-swatch" style={{ backgroundColor: project.color }} />
+  return <div className="grid min-w-0 grid-cols-[190px_minmax(0,1fr)] max-[760px]:grid-cols-[160px_minmax(0,1fr)]" role="region" aria-label="Activity by project in the selected period">
+      <div className="min-w-0 border-r border-[var(--line)]">
+        <div className="h-12" />
+        {activity.map((project) => <div className="flex h-[58px] flex-col justify-start border-t border-[var(--line)] bg-[var(--surface)] px-4 py-[10px]" key={project.id}>
+          <Link className="flex min-w-0 items-center gap-2 text-sm font-bold text-[var(--ink)] hover:text-[var(--accent)]" href={`/projects/${project.id}`} title={`View ${project.name}`}>
+            <span className="h-2 w-2 flex-shrink-0 rounded-sm" style={{ backgroundColor: project.color }} />
             <span>{project.name}</span>
           </Link>
-          <span className="activity-project-duration">{formatDuration(project.total)}</span>
+          <span className="mt-1 block text-xs text-[var(--muted)] [font-variant-numeric:tabular-nums]">{formatDuration(project.total)}</span>
         </div>)}
       </div>
-      <div className="activity-plot-viewport" ref={viewport}>
+      <div className="relative min-w-0 overflow-x-hidden" ref={viewport}>
         <div
-          className="activity-plot"
+          className="relative w-full cursor-crosshair"
           ref={plot}
           onClickCapture={(event) => {
             if (!suppressClick.current) return;
@@ -140,20 +142,20 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
           onPointerMove={updateInteraction}
           onPointerUp={finishSelection}
         >
-          <div className="activity-axis-track">
-            {ticks.map((tick) => <div className="activity-tick" key={tick.value} style={{ left: `${((tick.value - start) / span) * 100}%` }}>
-              {tick.showLabel && <span className="activity-tick-label">{formatTick(tick.value)}</span>}
+          <div className="relative mx-5 h-12">
+            {ticks.map((tick) => <div className={`absolute left-0 top-0 bottom-0 w-px ${tick.major ? "bg-[#c8d1cd]" : "bg-[var(--line)]"}`} key={tick.value} style={{ left: `${((tick.value - start) / span) * 100}%` }}>
+              {tick.showLabel && <span className="absolute top-2 left-0 -translate-x-1/2 whitespace-pre-line text-left text-[10px] leading-tight text-[var(--muted)] [font-variant-numeric:tabular-nums]">{formatTimelineLabel(tick.value)}</span>}
             </div>)}
           </div>
-          {activity.length === 0 && <div className="empty activity-empty">No activity has been recorded in this range.</div>}
-          {activity.map((project) => <div className="activity-plot-row" key={project.id}>
-            <div className="activity-track">
-              {ticks.map((tick) => <span className={`activity-gridline ${tick.major ? "major" : ""}`} key={tick.value} style={{ left: `${((tick.value - start) / span) * 100}%` }} />)}
+          {activity.length === 0 && <div className="grid min-h-[150px] place-items-center p-8 text-center text-base text-[var(--muted)]">No activity has been recorded in this range.</div>}
+          {activity.map((project) => <div className="h-[58px] border-t border-[var(--line)]" key={project.id}>
+            <div className="relative mx-[13px] my-[13px] h-8 bg-[#f7f9f8]">
+            {ticks.map((tick) => <span className={`absolute left-0 top-0 bottom-0 w-px ${tick.major ? "bg-[#c8d1cd]" : "bg-[var(--line)]"}`} key={tick.value} style={{ left: `${((tick.value - start) / span) * 100}%` }} />)}
               {project.intervals.map((interval, index) => {
                 const left = ((interval.start - start) / span) * 100;
                 const width = ((interval.end - interval.start) / span) * 100;
                 return <Link
-                  className="activity-bar"
+                  className="group absolute top-[5px] h-[22px] min-w-0.5 rounded-[3px] border opacity-95 outline-2 outline-transparent outline-offset-1 transition-all duration-75 hover:opacity-100 hover:outline-[#17201d29] cursor-pointer"
                   data-end={interval.end}
                   href={`/projects/${project.id}`}
                   key={`${interval.start}-${index}`}
@@ -165,14 +167,14 @@ export function Timeline({ runs, projects, from, to, zoom, onZoomChange, alignSt
             </div>
           </div>)}
           {selection && Math.abs(selectionEnd - selectionStart) > 0 && <div
-            className="activity-selection"
+            className="pointer-events-none absolute bottom-0 top-[48px] z-10 border border-[#147c8da6] bg-[#147c8d24]"
             style={{
               left: selectionPosition(selectionStart, start, span),
               width: selectionWidth(selectionEnd - selectionStart, span),
             }}
           />}
-          <div className="activity-hover-guide" ref={hoverGuide} aria-hidden="true">
-            <span className="activity-hover-label" ref={hoverLabel} />
+          <div className="pointer-events-none absolute inset-y-0 z-20 w-px bg-[rgba(20,124,141,0.82)] opacity-0 transition-opacity duration-75" ref={hoverGuide} aria-hidden="true">
+            <span className={`absolute left-0 top-1 inline-flex min-h-7 items-center rounded bg-[#24312c] px-[7px] text-[10px] leading-tight whitespace-pre-line text-white shadow-[0_2px_7px_rgba(23,32,29,0.18)] ${hoverHint === "start" ? "translate-x-0 ml-[6px]" : hoverHint === "end" ? "translate-x-[-100%] ml-[-6px]" : "translate-x-[-50%]"}`} ref={hoverLabel} />
           </div>
         </div>
       </div>
@@ -190,21 +192,33 @@ function selectionWidth(value: number, span: number) {
 }
 
 function ticksForRange(start: number, finish: number) {
-  const tickMap = new Map<number, { value: number; showLabel: boolean; major: boolean }>();
-  tickMap.set(start, { value: start, showLabel: true, major: false });
+  const tickMap = new Map<number, { value: number; showLabel: boolean; major: boolean; showDate: boolean }>();
+  tickMap.set(start, { value: start, showLabel: true, major: false, showDate: isLocalDayStart(start) });
 
-  const day = new Date(start);
-  day.setTime(startOfLocalDay(start));
-  if (day.getTime() < start) day.setDate(day.getDate() + 1);
-  for (let tick = day.getTime(); tick < finish; tick = nextLocalDay(tick)) {
-    tickMap.set(tick, { value: tick, showLabel: true, major: true });
+  const useHourlyTicks = finish - start <= 24 * HOUR_MS;
+  if (useHourlyTicks) {
+    const hour = new Date(start);
+    hour.setMinutes(0, 0, 0);
+    if (hour.getTime() <= start) hour.setHours(hour.getHours() + 1);
+    for (let tick = hour.getTime(); tick < finish; tick += HOUR_MS) {
+      tickMap.set(tick, { value: tick, showLabel: true, major: true, showDate: isLocalDayStart(tick) });
+    }
+  } else {
+    const day = new Date(start);
+    day.setTime(startOfLocalDay(start));
+    if (day.getTime() < start) day.setDate(day.getDate() + 1);
+    for (let tick = day.getTime(); tick < finish; tick = nextLocalDay(tick)) {
+      tickMap.set(tick, { value: tick, showLabel: true, major: true, showDate: true });
+    }
   }
 
   const days = (finish - start) / (24 * 60 * 60 * 1000);
-  const labelInterval = days <= 8 ? 1 : days <= 32 ? 5 : 14;
+  const labelInterval = useHourlyTicks ? 3 : days <= 8 ? 1 : days <= 32 ? 5 : 14;
   const ticks = [...tickMap.values()].sort((a, b) => a.value - b.value);
-  ticks.forEach((tick, index) => { tick.showLabel = index % labelInterval === 0; });
-  ticks.push({ value: finish, showLabel: true, major: false });
+  ticks.forEach((tick, index) => {
+    tick.showLabel = index % labelInterval === 0 || (useHourlyTicks && tick.showDate);
+  });
+  ticks.push({ value: finish, showLabel: true, major: false, showDate: isLocalDayStart(finish) });
   return ticks;
 }
 
@@ -265,29 +279,37 @@ function mergeIntervals(intervals: Interval[]) {
   return merged;
 }
 
-function formatTick(value: number) {
+function isLocalDayStart(value: number) {
+  return startOfLocalDay(value) === value;
+}
+
+function formatTimelineLabel(value: number, showDate = true) {
+  return showDate ? `${formatDate(value)}\n${formatTime(value)}` : formatTime(value);
+}
+
+export function formatCompactDateTime(value: number) {
+  return `${formatDate(value)} ${formatTime(value)}`;
+}
+
+function formatDate(value: number) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
     timeZone: DISPLAY_TIME_ZONE,
   }).format(new Date(value));
 }
 
-function formatHoverTime(value: number) {
+function formatTime(value: number) {
   return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
     timeZone: DISPLAY_TIME_ZONE,
   }).format(new Date(value));
 }
 
 function formatInterval(interval: Interval) {
-  const format = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIME_ZONE });
-  return `${format.format(new Date(interval.start))} - ${format.format(new Date(interval.end))}`;
+  return `${formatCompactDateTime(interval.start)} - ${formatCompactDateTime(interval.end)}`;
 }
 
 function formatDuration(milliseconds: number) {

@@ -43,7 +43,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       subtitle="Aggregated activity across all sessions"
       period={new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
     />
-    <section className="metrics" aria-label="Primary metrics">
+    <section className="mb-5 grid min-w-0 grid-cols-[repeat(5,minmax(0,1fr))] border border-[var(--line)] bg-[var(--surface)]" aria-label="Primary metrics">
       <Metric label="Agent time" value={formatDuration(summaryData.agent_seconds)} meta="Overlap counts too"/>
       <Metric label="Wall-clock time" value={formatDuration(summaryData.wall_clock_seconds)} meta="Union of intervals"/>
       <Metric label="Peak parallelism" value={String(summaryData.parallelism_peak)} meta="Today's peak, not real time"/>
@@ -61,14 +61,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       title={activityRangeConfig.title}
       to={timelineData.to}
     />
-    <section className="panel">
+    <section className="border border-[var(--line)] bg-[var(--surface)]">
       <AutoRefresh />
-      <div className="panel-head">
+      <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3.5">
         <div>
-          <h2 className="panel-title">Time by project</h2>
-          <p className="panel-note">Accumulated agent time today</p>
+          <h2 className="text-sm font-semibold tracking-normal">Time by project</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">Accumulated agent time today</p>
         </div>
-        <span className="panel-subtitle">{chartValues.length} projects</span>
+        <span className="text-xs text-[var(--muted)]">{chartValues.length} projects</span>
       </div>
       <ProjectChart values={chartValues} />
     </section>

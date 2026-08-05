@@ -17,18 +17,36 @@ export default async function SessionsPage() {
 
   return <>
     <PageHeader title="Sessions" subtitle="Native Codex conversations; imported Wakapi activity does not create sessions here" />
-    <div className="table-wrap">{sessions.length ? <table>
-      <thead><tr><th>Project</th><th>Source</th><th>Runs</th><th>Machine</th><th>Start</th><th>Last activity</th><th>Session</th></tr></thead>
-      <tbody>{sessions.map((session) => <tr key={session.id}>
-        <td><Link className="project-link" href={`/projects/${session.project_id}`}><strong>{projectNames.get(session.project_id) || short(session.project_id)}</strong><ArrowUpRight size={13}/></Link></td>
-        <td><span className={`badge source-${session.source}`}>{sourceLabel(session.source)}</span></td>
-        <td className="numeric">{session.run_count}</td>
-        <td>{machineNames.get(session.machine_id) || short(session.machine_id)}</td>
-        <td>{date(session.started_at)}</td>
-        <td>{date(session.last_activity_at)}</td>
-        <td><span className="session-id" title={session.id}><TerminalSquare size={13}/>{short(stripPrefix(session.id))}</span></td>
-      </tr>)}</tbody>
-    </table> : <div className="empty">No native sessions have been recorded yet.</div>}</div>
+    <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+      {sessions.length ? (
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Project</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Source</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Runs</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Machine</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Start</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Last activity</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Session</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session) => <tr key={session.id}>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><Link className="inline-flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)]" href={`/projects/${session.project_id}`}><strong>{projectNames.get(session.project_id) || short(session.project_id)}</strong><ArrowUpRight size={13} /></Link></td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{sessionBadge(session.source)}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{session.run_count}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{machineNames.get(session.machine_id) || short(session.machine_id)}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{date(session.started_at)}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{date(session.last_activity_at)}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><span className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] font-mono" title={session.id}><TerminalSquare size={13} />{short(stripPrefix(session.id))}</span></td>
+            </tr>)}
+          </tbody>
+        </table>
+      ) : (
+        <div className="grid min-h-[220px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No native sessions have been recorded yet.</div>
+      )}
+    </div>
   </>;
 }
 
@@ -45,6 +63,12 @@ function date(value: string) {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
 }
 
-function sourceLabel(value: string) {
-  return value === "hook" ? "Hooks" : value === "codex" ? "Codex history" : value;
+function sessionBadge(source: string) {
+  if (source === "hook") {
+    return <span className="inline-flex min-h-[22px] items-center rounded bg-[#dff2e9] px-2 text-[11px] font-semibold text-[var(--accent)]">Hooks</span>;
+  }
+  if (source === "codex") {
+    return <span className="inline-flex min-h-[22px] items-center rounded bg-[#e8eef4] px-2 text-[11px] font-semibold text-[#526f8a]">Codex history</span>;
+  }
+  return <span className="inline-flex min-h-[22px] items-center rounded bg-[var(--surface-muted)] px-2 text-[11px] font-semibold text-[var(--muted)]">{source}</span>;
 }

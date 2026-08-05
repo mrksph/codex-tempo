@@ -66,7 +66,7 @@ export default async function ProjectDetailPage({
     : PROJECT_RANGES[selectedRange].activityTitle;
 
   return <>
-    <Link className="back-link" href="/projects"><ChevronLeft size={15}/>Projects</Link>
+    <Link className="mb-3 inline-flex items-center gap-1.5 text-sm font-bold text-[var(--muted)] hover:text-[var(--accent)]" href="/projects"><ChevronLeft size={15}/>Projects</Link>
     <PageHeader
       title={project.name}
       subtitle="Project activity details"
@@ -83,7 +83,7 @@ export default async function ProjectDetailPage({
       />}
     />
     {selectedStatsRange === "custom" && <CustomActivityRange
-      className="stats-custom-range"
+      className="mb-[-12px] mt-0 bg-transparent border-0 p-0 max-[760px]:w-full"
       from={statsRange.inputFrom}
       fromParam="statsFrom"
       key={`${statsRange.inputFrom}-${statsRange.inputTo}`}
@@ -91,7 +91,7 @@ export default async function ProjectDetailPage({
       to={statsRange.inputTo}
       toParam="statsTo"
     />}
-    <section className="metrics" aria-label="Project metrics">
+    <section className="mb-5 grid min-w-0 grid-cols-[repeat(5,minmax(0,1fr))] border border-[var(--line)] bg-[var(--surface)]" aria-label="Project metrics">
       <Metric label="Lifetime total" value={formatDuration(project.agent_seconds)} meta={`${project.run_count} runs recorded`}/>
       <Metric label="Agent time" value={formatDuration(summary.agent_seconds)} meta={statsPeriodLabel}/>
       <Metric label="Wall-clock time" value={formatDuration(summary.wall_clock_seconds)} meta="No overlap"/>
@@ -113,18 +113,28 @@ export default async function ProjectDetailPage({
       title={timelineTitle}
       to={timeline.to}
     />
-    <section className="panel">
-      <div className="panel-head"><h2 className="panel-title">Recent activity</h2><span className="panel-subtitle">Last 20 runs</span></div>
-      {recentRuns.length ? <div className="table-scroll"><table>
-        <thead><tr><th>Start</th><th>Duration</th><th>Source</th><th>Model</th><th>Status</th></tr></thead>
-        <tbody>{recentRuns.map((run) => <tr key={run.id}>
-          <td>{formatDate(run.started_at)}</td>
-          <td className="numeric">{formatRunDuration(run)}</td>
-          <td><span className={`badge source-${source(run.session_id)}`}>{sourceLabel(run.session_id)}</span></td>
-          <td>{run.model || "-"}</td>
-          <td><span className="badge">{statusLabel(run.status)}</span></td>
-        </tr>)}</tbody>
-      </table></div> : <div className="empty activity-empty">No recent activity has been recorded for this project.</div>}
+    <section className="border border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3.5"><h2 className="text-sm font-semibold tracking-normal">Recent activity</h2><span className="text-xs text-[var(--muted)]">Last 20 runs</span></div>
+      {recentRuns.length ? <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Start</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Duration</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Source</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Model</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Status</th>
+            </tr>
+          </thead>
+          <tbody>{recentRuns.map((run) => <tr key={run.id}>
+            <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{formatDate(run.started_at)}</td>
+            <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{formatRunDuration(run)}</td>
+            <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{runSourceBadge(run.session_id)}</td>
+            <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{run.model || "-"}</td>
+            <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><span className="inline-flex min-h-[22px] items-center rounded bg-[var(--surface-muted)] px-2 text-[11px] font-semibold text-[var(--muted)]">{statusLabel(run.status)}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <div className="grid min-h-[150px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No recent activity has been recorded for this project.</div>}
     </section>
   </>;
 }
@@ -226,9 +236,15 @@ function source(sessionID: string) {
   return sessionID.startsWith("wakapi:") ? "wakapi" : sessionID.startsWith("hook:") ? "hook" : "codex";
 }
 
-function sourceLabel(sessionID: string) {
-  const value = source(sessionID);
-  return value === "wakapi" ? "Wakapi" : value === "hook" ? "Hooks" : "Codex";
+function runSourceBadge(sessionId: string) {
+  const value = source(sessionId);
+  if (value === "hook") {
+    return <span className="inline-flex min-h-[22px] items-center rounded bg-[#dff2e9] px-2 text-[11px] font-semibold text-[var(--accent)]">Hooks</span>;
+  }
+  if (value === "codex") {
+    return <span className="inline-flex min-h-[22px] items-center rounded bg-[#e8eef4] px-2 text-[11px] font-semibold text-[#526f8a]">Codex</span>;
+  }
+  return <span className="inline-flex min-h-[22px] items-center rounded bg-[#fff0dc] px-2 text-[11px] font-semibold text-[#9a5f16]">Wakapi</span>;
 }
 
 function statusLabel(value: string) {

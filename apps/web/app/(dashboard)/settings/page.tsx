@@ -1,6 +1,43 @@
 import { PageHeader } from "@/components/page-header";
 import { SetupKey } from "@/components/setup-key";
 
-export const dynamic="force-dynamic";
+export const dynamic = "force-dynamic";
 
-export default function SettingsPage(){const setupKey=process.env.AGENT_SETUP_KEY||process.env.ADMIN_TOKEN||"Not configured";const serverURL=process.env.PUBLIC_API_URL||"http://localhost:8080";return <><PageHeader title="Settings" subtitle="Agents and privacy"/><div className="dashboard-grid"><section className="panel"><div className="panel-head"><h2 className="panel-title">Agent registration</h2></div><div style={{padding:16,display:"grid",gap:16,fontSize:13}}><label className="field">Server URL<input value={serverURL} readOnly/></label><label className="field">Setup key<SetupKey value={setupKey}/></label></div></section><section className="panel"><div className="panel-head"><h2 className="panel-title">Privacy</h2></div><div style={{padding:16,display:"grid",gap:14,fontSize:13}}><label style={{display:"flex",justifyContent:"space-between",gap:20}}>Store project paths <input type="checkbox" disabled/></label><label style={{display:"flex",justifyContent:"space-between",gap:20}}>Store tool names <input type="checkbox" defaultChecked disabled/></label><label style={{display:"flex",justifyContent:"space-between",gap:20}}>Store content <input type="checkbox" disabled/></label></div></section></div></>}
+export default function SettingsPage() {
+  const setupKey = process.env.AGENT_SETUP_KEY || process.env.ADMIN_TOKEN || "Not configured";
+  const serverURL = process.env.PUBLIC_API_URL || "http://localhost:8080";
+
+  return (
+    <>
+      <PageHeader title="Settings" subtitle="Agents and privacy" />
+      <div className="grid gap-6">
+        <section className="border border-[var(--line)] bg-[var(--surface)]">
+          <div className="flex min-h-[52px] items-center border-b border-[var(--line)] px-4 py-3.5">
+            <h2 className="text-sm font-semibold tracking-normal">Agent registration</h2>
+          </div>
+          <div className="grid gap-4 p-4 text-[13px]">
+            <label className="grid gap-1.5">
+              <span>Server URL</span>
+              <input className="h-10 border border-[var(--line)] px-2.5" value={serverURL} readOnly />
+            </label>
+            <label className="grid gap-1.5">
+              Setup key
+              <SetupKey value={setupKey} />
+            </label>
+          </div>
+        </section>
+
+        <section className="border border-[var(--line)] bg-[var(--surface)]">
+          <div className="flex min-h-[52px] items-center border-b border-[var(--line)] px-4 py-3.5">
+            <h2 className="text-sm font-semibold tracking-normal">Privacy</h2>
+          </div>
+          <div className="grid gap-3.5 p-4 text-[13px]">
+            <label className="flex items-center justify-between gap-5">Store project paths <input type="checkbox" disabled /></label>
+            <label className="flex items-center justify-between gap-5">Store tool names <input type="checkbox" defaultChecked disabled /></label>
+            <label className="flex items-center justify-between gap-5">Store content <input type="checkbox" disabled /></label>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}

@@ -53,7 +53,7 @@ export function ActivityRangeSelect({
 
   return <select
     aria-label={ariaLabel}
-    className="range-select"
+    className="h-8 cursor-pointer rounded border border-[var(--line)] bg-[var(--surface)] px-3 text-[11px] text-[var(--ink)]"
     disabled={pending}
     onChange={(event) => changeRange(event.target.value as ActivityRangeSelection)}
     value={value}
@@ -96,31 +96,33 @@ export function CustomActivityRange({
     startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
   }
 
-  return <form className={`activity-custom-range${className ? ` ${className}` : ""}`} onSubmit={applyRange}>
-    <label className="activity-date-field">
+  return <form className={`min-h-[54px] border-b border-[var(--line)] bg-[#fafbfa] flex items-end justify-end gap-2.5 px-4 py-2.5 ${className || ""}`} onSubmit={applyRange}>
+    <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
       <span>Start date</span>
       <input
-        className="activity-date-input"
+        className="h-8 w-[142px] border border-[var(--line)] bg-[var(--surface)] px-2 py-0 text-[var(--ink)]"
         max={endDate || today}
         onChange={(event) => setStartDate(event.target.value)}
         required
         type="date"
         value={startDate}
+        style={{ colorScheme: "light" }}
       />
     </label>
-    <label className="activity-date-field">
+    <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
       <span>End date</span>
       <input
-        className="activity-date-input"
+        className="h-8 w-[142px] border border-[var(--line)] bg-[var(--surface)] px-2 py-0 text-[var(--ink)]"
         max={today}
         min={startDate}
         onChange={(event) => setEndDate(event.target.value)}
         required
         type="date"
         value={endDate}
+        style={{ colorScheme: "light" }}
       />
     </label>
-    <button className="activity-apply-range" disabled={pending || !startDate || !endDate || startDate > endDate} type="submit">
+    <button className={`inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-xs font-bold ${!startDate || !endDate || startDate > endDate || pending ? "cursor-wait opacity-60" : "cursor-pointer"} border border-[var(--accent)] bg-[var(--accent)] text-white`} disabled={pending || !startDate || !endDate || startDate > endDate} type="submit">
       <ListFilter size={14} aria-hidden="true" />
       <span>Apply</span>
     </button>

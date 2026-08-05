@@ -60,9 +60,9 @@ export function ProjectChart({ values }: { values: { id: string; name: string; s
     hasRendered.current = true;
   }, [values]);
 
-  return <div className="chart-shell">
-    <div ref={ref} className="chart" role="img" aria-label="Agent time by project" />
-    {!values.length && <div className="empty chart-empty">No activity has been recorded in this period yet.</div>}
+  return <div className="relative min-h-[310px]">
+    <div ref={ref} className="h-[310px] w-full" role="img" aria-label="Agent time by project" />
+    {!values.length && <div className="absolute inset-0 grid min-h-0 place-items-center bg-[var(--surface)] p-8 text-center text-[13px] text-[var(--muted)]">No activity has been recorded in this period yet.</div>}
   </div>;
 }
 

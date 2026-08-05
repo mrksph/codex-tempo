@@ -16,16 +16,32 @@ export default async function ProjectsPage() {
 
   return <>
     <PageHeader title="Projects" subtitle="Recent and historical activity by repository" />
-    <div className="table-wrap">{projects.length ? <table>
-      <thead><tr><th>Project</th><th>Last 30 days</th><th>Total tracked</th><th>Runs</th><th>Last activity</th></tr></thead>
-      <tbody>{projects.map((project) => <tr key={project.id}>
-        <td><Link className="project-link" href={`/projects/${project.id}`}><FolderKanban size={15}/><strong>{project.name}</strong><ArrowUpRight size={13}/></Link></td>
-        <td className="numeric"><strong>{recentDuration(summary.project_span_seconds[project.id] || 0)}</strong></td>
-        <td className="numeric">{duration(project.agent_seconds)}</td>
-        <td className="numeric">{project.run_count}</td>
-        <td>{project.last_active_at ? date(project.last_active_at) : "-"}</td>
-      </tr>)}</tbody>
-    </table> : <div className="empty">No projects have been recorded yet.</div>}</div>
+    <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+      {projects.length ? (
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Project</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Last 30 days</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Total tracked</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Runs</th>
+              <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Last activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map((project) => <tr key={project.id}>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><Link className="inline-flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)]" href={`/projects/${project.id}`}><FolderKanban size={15} /><strong>{project.name}</strong><ArrowUpRight size={13} /></Link></td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]"><strong>{recentDuration(summary.project_span_seconds[project.id] || 0)}</strong></td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{duration(project.agent_seconds)}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{project.run_count}</td>
+              <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{project.last_active_at ? date(project.last_active_at) : "-"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      ) : (
+        <div className="grid min-h-[220px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No projects have been recorded yet.</div>
+      )}
+    </div>
   </>;
 }
 
