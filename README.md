@@ -199,6 +199,17 @@ The setup key itself is not retained.
 
 Repeat the process for each machine that should report activity.
 
+If you want to point the agent at a different server without editing
+`~/.config/codex-tempo/config.toml`, export:
+
+```bash
+export CODEX_TEMPO_SERVER_URL=http://localhost:8080
+export CODEX_TEMPO_MACHINE_TOKEN=...
+```
+
+Those environment variables override the persisted values at runtime, which is
+useful when switching between a production deployment and a local test server.
+
 ## Local Agent and CLI
 
 Build the local tools from source:
@@ -263,6 +274,10 @@ The production Compose stack uses values including:
 | `API_PORT`           | API port                            |
 
 Use [`.env.example`](./.env.example) as the source of truth for the complete configuration and any defaults.
+
+If the dashboard is served over plain HTTP, leave `AUTH_COOKIE_SECURE` unset
+or set it to `false`. When the app is behind HTTPS and sends
+`x-forwarded-proto: https`, the session cookie is marked secure automatically.
 
 ## Privacy
 

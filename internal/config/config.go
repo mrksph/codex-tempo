@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -77,6 +78,7 @@ func Load(path string) (Config, error) {
 	}
 	cfg.DataDir = expandHome(cfg.DataDir)
 	cfg.CodexHome = expandHome(cfg.CodexHome)
+	applyEnvOverrides(&cfg)
 	if cfg.HookSyncInterval <= 0 {
 		cfg.HookSyncInterval = 30 * time.Second
 	}
@@ -87,6 +89,18 @@ func Load(path string) (Config, error) {
 		cfg.LogRetention = 14 * 24 * time.Hour
 	}
 	return cfg, nil
+}
+
+func applyEnvOverrides(cfg *Config) {
+	if value := strings.TrimSpace(os.Getenv("CODEX_TEMPO_SERVER_URL")); value != "" {
+		cfg.ServerURL = strings.TrimRight(value, "/")
+	}
+	if value := strings.TrimSpace(os.Getenv("CODEX_TEMPO_MACHINE_TOKEN")); value != "" {
+		cfg.MachineToken = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CODEX_TEMPO_MACHINE_NAME")); value != "" {
+		cfg.MachineName = value
+	}
 }
 
 func Save(path string, cfg Config) error {

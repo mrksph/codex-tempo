@@ -54,3 +54,23 @@ func TestSaveRoundTrip(t *testing.T) {
 		t.Fatalf("round trip = %#v", got)
 	}
 }
+
+func TestLoadAppliesEnvOverrides(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_TEMPO_SERVER_URL", "http://localhost:8080/")
+	t.Setenv("CODEX_TEMPO_MACHINE_TOKEN", "override-token")
+	t.Setenv("CODEX_TEMPO_MACHINE_NAME", "dev-box")
+	path := filepath.Join(t.TempDir(), "config.toml")
+	data := []byte("server_url = \"https://tempo.example.com\"\nmachine_token = \"prod-token\"\nmachine_name = \"prod-box\"\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ServerURL != "http://localhost:8080" || cfg.MachineToken != "override-token" || cfg.MachineName != "dev-box" {
+		t.Fatalf("env overrides not applied: %#v", cfg)
+	}
+}
