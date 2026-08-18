@@ -1,17 +1,21 @@
 import { PageHeader } from "@/components/page-header";
+import { TablePagination } from "@/components/table-pagination";
 import { tempoFetch } from "@/lib/api/client";
+import { paginate } from "@/lib/pagination";
 import type { Machine } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function MachinesPage() {
+export default async function MachinesPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
+  const queryParams = await searchParams;
   const { machines } = await tempoFetch<{ machines: Machine[] }>("/api/v1/machines");
+  const pagination = paginate(machines, queryParams.page);
   return (
     <>
       <PageHeader title="Machines" subtitle="Authorized agents and last sync" />
-      <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+      <div className="border border-[var(--line)] bg-[var(--surface)]" id="machines-table">
         {machines.length ? (
-          <table className="w-full border-collapse text-xs">
+          <><div className="overflow-x-auto"><table className="w-full border-collapse text-xs">
             <thead>
               <tr>
                 <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Name</th>
@@ -22,7 +26,7 @@ export default async function MachinesPage() {
               </tr>
             </thead>
             <tbody>
-              {machines.map((machine) => {
+              {pagination.items.map((machine) => {
                 const online = machine.last_seen_at && Date.now() - new Date(machine.last_seen_at).getTime() < 120000;
                 return (
                   <tr key={machine.id}>
@@ -41,7 +45,7 @@ export default async function MachinesPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div><TablePagination anchor="machines-table" {...pagination}/></>
         ) : (
           <div className="grid min-h-[220px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No machines have been registered yet.</div>
         )}

@@ -9,7 +9,9 @@ import {
 import { ActivityTimelinePanel } from "@/components/activity-timeline-panel";
 import { Metric } from "@/components/metric";
 import { PageHeader } from "@/components/page-header";
+import { TablePagination } from "@/components/table-pagination";
 import { tempoFetch, calendarRecentRange, recentRange } from "@/lib/api/client";
+import { paginate } from "@/lib/pagination";
 import type { Project, Run, Summary } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,7 @@ export default async function ProjectDetailPage({
     statsRange?: string | string[];
     statsFrom?: string | string[];
     statsTo?: string | string[];
+    runsPage?: string | string[];
   }>;
 }) {
   const { id } = await params;
@@ -55,6 +58,7 @@ export default async function ProjectDetailPage({
     tempoFetch<{ runs: Run[] }>(`/api/v1/reports/timeline?${recentQuery}`),
   ]);
   const recentRuns = recentTimeline.runs.slice(0, 20);
+  const recentPagination = paginate(recentRuns, queryParams.runsPage);
   const tokens = summary.input_tokens + summary.output_tokens;
   const statsPeriodLabel = selectedStatsRange === "custom"
     ? statsRange.inputFrom === statsRange.inputTo
@@ -113,9 +117,9 @@ export default async function ProjectDetailPage({
       title={timelineTitle}
       to={timeline.to}
     />
-    <section className="border border-[var(--line)] bg-[var(--surface)]">
+    <section className="border border-[var(--line)] bg-[var(--surface)]" id="recent-runs-table">
       <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3.5"><h2 className="text-sm font-semibold tracking-normal">Recent activity</h2><span className="text-xs text-[var(--muted)]">Last 20 runs</span></div>
-      {recentRuns.length ? <div className="overflow-x-auto">
+      {recentRuns.length ? <><div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
@@ -126,7 +130,7 @@ export default async function ProjectDetailPage({
               <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Status</th>
             </tr>
           </thead>
-          <tbody>{recentRuns.map((run) => <tr key={run.id}>
+          <tbody>{recentPagination.items.map((run) => <tr key={run.id}>
             <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{formatDate(run.started_at)}</td>
             <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{formatRunDuration(run)}</td>
             <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{runSourceBadge(run.session_id)}</td>
@@ -134,7 +138,7 @@ export default async function ProjectDetailPage({
             <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><span className="inline-flex min-h-[22px] items-center rounded bg-[var(--surface-muted)] px-2 text-[11px] font-semibold text-[var(--muted)]">{statusLabel(run.status)}</span></td>
           </tr>)}</tbody>
         </table>
-      </div> : <div className="grid min-h-[150px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No recent activity has been recorded for this project.</div>}
+      </div><TablePagination anchor="recent-runs-table" pageParam="runsPage" {...recentPagination}/></> : <div className="grid min-h-[150px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No recent activity has been recorded for this project.</div>}
     </section>
   </>;
 }

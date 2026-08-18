@@ -10,7 +10,7 @@ const links = [
 ] as const;
 
 export function Sidebar() {
-  return <aside className="sticky top-0 min-h-screen flex-col bg-[#17201d] px-[14px] py-[22px] text-[#dbe4e0] flex max-[760px]:static max-[760px]:h-auto max-[760px]:w-full max-[760px]:p-3">
+  return <aside className="sticky top-0 flex h-screen min-h-0 min-w-0 self-start flex-col overflow-x-hidden overflow-y-auto bg-[#17201d] px-[14px] py-[22px] text-[#dbe4e0] max-[760px]:static max-[760px]:h-auto max-[760px]:min-h-0 max-[760px]:w-full max-[760px]:overflow-visible max-[760px]:p-3">
     <Link href="/dashboard" className="mb-[14px] flex items-center gap-2.5 px-2.5 py-0 font-semibold text-white">
       <span className="grid h-7 w-7 place-items-center rounded border border-[#52615b] text-[#65caa5]"><Clock3 size={16}/></span>
       <span>Codex Tempo</span>

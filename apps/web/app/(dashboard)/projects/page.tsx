@@ -1,24 +1,28 @@
 import { ArrowUpRight, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { TablePagination } from "@/components/table-pagination";
 import { tempoFetch, recentRange } from "@/lib/api/client";
+import { paginate } from "@/lib/pagination";
 import type { Project, Summary } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }) {
+  const queryParams = await searchParams;
   const range = recentRange(30);
   const query = new URLSearchParams(range).toString();
   const [{ projects }, summary] = await Promise.all([
     tempoFetch<{ projects: Project[] }>("/api/v1/projects"),
     tempoFetch<Summary>(`/api/v1/reports/summary?${query}`),
   ]);
+  const pagination = paginate(projects, queryParams.page);
 
   return <>
     <PageHeader title="Projects" subtitle="Recent and historical activity by repository" />
-    <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+    <div className="border border-[var(--line)] bg-[var(--surface)]" id="projects-table">
       {projects.length ? (
-        <table className="w-full border-collapse text-xs">
+        <><div className="overflow-x-auto"><table className="w-full border-collapse text-xs">
           <thead>
             <tr>
               <th className="border-b border-[var(--line)] bg-[#fafbfa] px-3.5 py-[11px] text-left text-[10px] uppercase tracking-wide text-[var(--muted)]">Project</th>
@@ -29,7 +33,7 @@ export default async function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {projects.map((project) => <tr key={project.id}>
+            {pagination.items.map((project) => <tr key={project.id}>
               <td className="border-b border-[var(--line)] px-3.5 py-[13px]"><Link className="inline-flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)]" href={`/projects/${project.id}`}><FolderKanban size={15} /><strong>{project.name}</strong><ArrowUpRight size={13} /></Link></td>
               <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]"><strong>{recentDuration(summary.project_span_seconds[project.id] || 0)}</strong></td>
               <td className="border-b border-[var(--line)] px-3.5 py-[13px] [font-variant-numeric:tabular-nums]">{duration(project.agent_seconds)}</td>
@@ -37,7 +41,7 @@ export default async function ProjectsPage() {
               <td className="border-b border-[var(--line)] px-3.5 py-[13px]">{project.last_active_at ? date(project.last_active_at) : "-"}</td>
             </tr>)}
           </tbody>
-        </table>
+        </table></div><TablePagination anchor="projects-table" {...pagination}/></>
       ) : (
         <div className="grid min-h-[220px] place-items-center p-8 text-center text-[13px] text-[var(--muted)]">No projects have been recorded yet.</div>
       )}
