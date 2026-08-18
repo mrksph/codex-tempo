@@ -14,6 +14,7 @@ type Interval struct {
 
 type Summary struct {
 	AgentTime          time.Duration            `json:"agent_time"`
+	SessionAgentTime   time.Duration            `json:"session_agent_time"`
 	WallClock          time.Duration            `json:"wall_clock"`
 	ProjectSpan        map[string]time.Duration `json:"project_span"`
 	ParallelismPeak    int                      `json:"parallelism_peak"`
@@ -94,7 +95,7 @@ func Summarize(runs []domain.Run, from, to, now time.Time) Summary {
 			continue
 		}
 		result.RunCount++
-		result.AgentTime += iv.End.Sub(iv.Start)
+		result.SessionAgentTime += iv.End.Sub(iv.Start)
 		result.InputTokens += run.InputTokens
 		result.CachedInputTokens += run.CachedInputTokens
 		result.OutputTokens += run.OutputTokens
@@ -106,6 +107,7 @@ func Summarize(runs []domain.Run, from, to, now time.Time) Summary {
 	result.WallClock = Duration(Merge(all))
 	for project, values := range byProject {
 		result.ProjectSpan[project] = Duration(Merge(values))
+		result.AgentTime += result.ProjectSpan[project]
 	}
 	sort.Slice(points, func(i, j int) bool {
 		if points[i].at.Equal(points[j].at) {

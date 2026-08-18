@@ -177,7 +177,7 @@ func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	for id, duration := range value.ProjectSpan {
 		projectSeconds[id] = duration.Seconds()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"from": from, "to": to, "agent_seconds": value.AgentTime.Seconds(), "wall_clock_seconds": value.WallClock.Seconds(), "project_span_seconds": projectSeconds, "parallelism_peak": value.ParallelismPeak, "parallelism_average": value.ParallelismAverage, "run_count": value.RunCount, "input_tokens": value.InputTokens, "cached_input_tokens": value.CachedInputTokens, "output_tokens": value.OutputTokens, "reasoning_tokens": value.ReasoningTokens})
+	writeJSON(w, http.StatusOK, map[string]any{"from": from, "to": to, "agent_seconds": value.AgentTime.Seconds(), "session_agent_seconds": value.SessionAgentTime.Seconds(), "wall_clock_seconds": value.WallClock.Seconds(), "project_span_seconds": projectSeconds, "parallelism_peak": value.ParallelismPeak, "parallelism_average": value.ParallelismAverage, "run_count": value.RunCount, "input_tokens": value.InputTokens, "cached_input_tokens": value.CachedInputTokens, "output_tokens": value.OutputTokens, "reasoning_tokens": value.ReasoningTokens})
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {

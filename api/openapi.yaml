@@ -181,7 +181,8 @@ components:
       properties:
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
-        agent_seconds: { type: number }
+        agent_seconds: { type: number, description: Unique project time; overlapping sessions in the same project count once. }
+        session_agent_seconds: { type: number, description: Raw accumulated time across sessions, including overlap. }
         wall_clock_seconds: { type: number }
         project_span_seconds: { type: object, additionalProperties: { type: number } }
         parallelism_peak: { type: integer }

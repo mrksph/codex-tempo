@@ -41,3 +41,19 @@ func TestHalfOpenIntervalsDoNotOverlap(t *testing.T) {
 		t.Fatalf("unexpected summary: %#v", got)
 	}
 }
+
+func TestProjectTimeDoesNotDoubleCountOverlappingSessions(t *testing.T) {
+	base := time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC)
+	aEnd, bEnd := base.Add(20*time.Minute), base.Add(25*time.Minute)
+	runs := []domain.Run{
+		{ID: "primary", ProjectID: "same", StartedAt: base, EndedAt: &aEnd},
+		{ID: "subagent", ProjectID: "same", StartedAt: base.Add(5 * time.Minute), EndedAt: &bEnd},
+	}
+	got := Summarize(runs, base, base.Add(time.Hour), base.Add(time.Hour))
+	if got.AgentTime != 25*time.Minute {
+		t.Fatalf("project time = %s, want 25m", got.AgentTime)
+	}
+	if got.SessionAgentTime != 40*time.Minute {
+		t.Fatalf("session time = %s, want 40m", got.SessionAgentTime)
+	}
+}

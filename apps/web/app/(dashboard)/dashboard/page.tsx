@@ -44,7 +44,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       period={new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date())}
     />
     <section className="mb-5 grid min-w-0 grid-cols-[repeat(5,minmax(0,1fr))] border border-[var(--line)] bg-[var(--surface)]" aria-label="Primary metrics">
-      <Metric label="Agent time" value={formatDuration(summaryData.agent_seconds)} meta="Overlap counts too"/>
+      <Metric label="Project time" value={formatDuration(summaryData.agent_seconds)} meta="Overlap counted once per project"/>
       <Metric label="Wall-clock time" value={formatDuration(summaryData.wall_clock_seconds)} meta="Union of intervals"/>
       <Metric label="Peak parallelism" value={String(summaryData.parallelism_peak)} meta="Today's peak, not real time"/>
       <Metric label="Runs" value={String(summaryData.run_count)} meta="Runs started today"/>
@@ -66,7 +66,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="flex min-h-[52px] items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3.5">
         <div>
           <h2 className="text-sm font-semibold tracking-normal">Time by project</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">Accumulated agent time today</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">Unique project time today</p>
         </div>
         <span className="text-xs text-[var(--muted)]">{chartValues.length} projects</span>
       </div>
