@@ -195,7 +195,10 @@ export interface components {
             from: string;
             /** Format: date-time */
             to: string;
+            /** @description Unique project time; overlapping sessions in the same project count once. */
             agent_seconds: number;
+            /** @description Raw accumulated time across sessions */
+            session_agent_seconds?: number;
             wall_clock_seconds: number;
             project_span_seconds: {
                 [key: string]: number;
