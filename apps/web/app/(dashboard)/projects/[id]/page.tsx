@@ -6,9 +6,10 @@ import {
   CustomActivityRange,
   type ActivityRangeSelection,
 } from "@/components/activity-range-select";
+import { ActivityMetrics } from "@/components/activity-metrics";
 import { ActivityTimelinePanel } from "@/components/activity-timeline-panel";
-import { Metric } from "@/components/metric";
 import { PageHeader } from "@/components/page-header";
+import { ProjectTimeSection } from "@/components/project-time-section";
 import { TablePagination } from "@/components/table-pagination";
 import { tempoFetch, calendarRecentRange, recentRange } from "@/lib/api/client";
 import { paginate } from "@/lib/pagination";
@@ -95,13 +96,20 @@ export default async function ProjectDetailPage({
       to={statsRange.inputTo}
       toParam="statsTo"
     />}
-    <section className="mb-5 grid min-w-0 grid-cols-[repeat(5,minmax(0,1fr))] border border-[var(--line)] bg-[var(--surface)]" aria-label="Project metrics">
-      <Metric label="Lifetime total" value={formatDuration(project.agent_seconds)} meta={`${project.run_count} runs recorded`}/>
-      <Metric label="Agent time" value={formatDuration(summary.agent_seconds)} meta={statsPeriodLabel}/>
-      <Metric label="Wall-clock time" value={formatDuration(summary.wall_clock_seconds)} meta="No overlap"/>
-      <Metric label="Runs" value={String(summary.run_count)} meta={statsPeriodLabel}/>
-      <Metric label="Tokens" value={compact(tokens)} meta={`${compact(summary.output_tokens)} output`}/>
-    </section>
+    <ActivityMetrics
+      parallelismPeak={summary.parallelism_peak}
+      periodLabel={statsPeriodLabel}
+      projectTime={summary.agent_seconds}
+      runs={summary.run_count}
+      scopeLabel="Overlap counted once for this project"
+      tokens={tokens}
+      wallClock={summary.wall_clock_seconds}
+      lifetime={{ meta: `${project.run_count} runs recorded`, value: formatDuration(project.agent_seconds) }}
+    />
+    <ProjectTimeSection
+      periodLabel={statsPeriodLabel.toLowerCase()}
+      values={[{ id: project.id, name: project.name, seconds: summary.project_span_seconds[project.id] || 0 }]}
+    />
     <ActivityTimelinePanel
       allowCustomRange
       customFrom={timelineRange.inputFrom}
@@ -230,10 +238,6 @@ function formatRunDuration(run: Run) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(value));
-}
-
-function compact(value: number) {
-  return new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 function source(sessionID: string) {
